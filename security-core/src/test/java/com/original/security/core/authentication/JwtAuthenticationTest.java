@@ -1,7 +1,8 @@
 package com.original.security.core.authentication;
 
-import com.original.security.core.authentication.JwtAuthenticationToken;
 import com.original.security.core.authentication.impl.DefaultAuthenticationProvider;
+import com.original.security.core.authentication.token.Token;
+import com.original.security.core.authentication.token.SimpleToken;
 import com.original.security.config.ConfigProvider;
 import com.original.security.plugin.AuthenticationPlugin;
 import com.original.security.plugin.impl.DefaultAuthenticationPlugin;
@@ -11,10 +12,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,39 +42,7 @@ class JwtAuthenticationTest {
         BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
         authenticationProvider = new DefaultAuthenticationProvider(passwordEncoder, mockConfigProvider);
 
-        // Mock 配置返回
-        when(mockConfigProvider.getConfig(anyString(), any())).thenReturn(Optional.empty());
-
         authenticationPlugin = new DefaultAuthenticationPlugin("jwt-authentication", authenticationProvider);
-    }
-
-    @Test
-    void testJwtAuthenticationCreation() {
-        // 创建有效的用户详情
-        User user = User.builder()
-            .username("testuser")
-            .password("password")
-            .authorities("ROLE_USER")
-            .build();
-
-        // 创建 JWT 认证令牌
-        String token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0dXNlciIsImV4cCI6MTIwMDAwMDAwMDAwLCJpYXQiOjE2MDAwMDAwMDAwMH0";
-        JwtAuthenticationToken jwtToken = new JwtAuthenticationToken(token, user);
-
-        assertTrue(jwtToken.isAuthenticated());
-        assertEquals(token, jwtToken.getCredentials());
-        assertEquals(user, jwtToken.getPrincipal());
-    }
-
-    @Test
-    void testJwtAuthenticationWithoutUserDetails() {
-        // 创建不带用户详情的 JWT 令牌
-        String token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0dXNlciIsImV4cCI6MTIwMDAwMDAwMDAwLCJpYXQiOjE2MDAwMDAwMDAwMH0";
-        JwtAuthenticationToken jwtToken = new JwtAuthenticationToken(token);
-
-        assertFalse(jwtToken.isAuthenticated());
-        assertNull(jwtToken.getPrincipal());
-        assertEquals(token, jwtToken.getCredentials());
     }
 
     @Test
@@ -83,14 +53,18 @@ class JwtAuthenticationTest {
 
     @Test
     void testAuthenticationProviderValidateToken() {
-        // 创建有效的 JWT 令牌
-        User user = User.builder()
-            .username("testuser")
-            .password("password")
-            .authorities("ROLE_USER")
-            .build();
+        // 创建有效的 Token 实现
+        Token token = new SimpleToken(
+            "test-token",
+            "JWT",
+            LocalDateTime.now(),
+            LocalDateTime.now().plusHours(1),
+            "system",
+            "testuser",
+            new String[]{"web"},
+            Collections.emptyMap()
+        );
 
-        JwtAuthenticationToken token = new JwtAuthenticationToken("valid-token", user);
         assertTrue(authenticationProvider.validateToken(token));
     }
 
@@ -101,17 +75,78 @@ class JwtAuthenticationTest {
 
     @Test
     void testAuthenticationProviderRefreshToken() {
-        // 创建有效的 JWT 令牌
-        User user = User.builder()
-            .username("testuser")
-            .password("password")
-            .authorities("ROLE_USER")
-            .build();
+        // 创建有效的 Token
+        when(mockConfigProvider.getConfig("security.token.expiration.hours", 1L))
+            .thenReturn(1L);
 
-        JwtAuthenticationToken originalToken = new JwtAuthenticationToken("valid-token", user);
+        Token originalToken = new SimpleToken(
+            "original-token",
+            "JWT",
+            LocalDateTime.now(),
+            LocalDateTime.now().plusHours(1),
+            "system",
+            "testuser",
+            new String[]{"web"},
+            Collections.emptyMap()
+        );
+
         Token refreshedToken = authenticationProvider.refreshToken(originalToken);
 
         assertNotNull(refreshedToken);
         assertEquals("testuser", refreshedToken.getSubject());
+    }
+
+    @Test
+    void testAuthenticationProviderRefreshExpiredToken() {
+        // 创建过期的 Token
+        Token expiredToken = new SimpleToken(
+            "expired-token",
+            "JWT",
+            LocalDateTime.now().minusHours(2),
+            LocalDateTime.now().minusHours(1),
+            "system",
+            "testuser",
+            new String[]{"web"},
+            Collections.emptyMap()
+        );
+
+        Token refreshedToken = authenticationProvider.refreshToken(expiredToken);
+
+        assertNull(refreshedToken);
+    }
+
+    @Test
+    void testTokenCreationWithClaims() {
+        Map<String, Object> claims = Collections.singletonMap("role", "admin");
+
+        Token token = new SimpleToken(
+            "admin-token",
+            "JWT",
+            LocalDateTime.now(),
+            LocalDateTime.now().plusHours(2),
+            "system",
+            "admin",
+            new String[]{"web"},
+            claims
+        );
+
+        assertEquals("admin", token.getSubject());
+        assertEquals("admin", token.getClaims().get("role"));
+    }
+
+    @Test
+    void testTokenExpiration() {
+        Token token = new SimpleToken(
+            "test",
+            "JWT",
+            LocalDateTime.now(),
+            LocalDateTime.now().minusHours(1), // 已过期
+            "system",
+            "testuser",
+            new String[]{"web"},
+            Collections.emptyMap()
+        );
+
+        assertFalse(authenticationProvider.validateToken(token));
     }
 }

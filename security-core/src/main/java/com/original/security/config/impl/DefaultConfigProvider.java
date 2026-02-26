@@ -93,7 +93,10 @@ public class DefaultConfigProvider implements ConfigProvider {
         Map<String, Object> result = new ConcurrentHashMap<>();
         configMap.entrySet().stream()
                 .filter(entry -> entry.getKey().startsWith(prefix))
-                .forEach(entry -> result.put(entry.getKey(), entry.getValue()));
+                .forEach(entry -> {
+                    String keyWithoutPrefix = entry.getKey().substring(prefix.length());
+                    result.put(keyWithoutPrefix, entry.getValue());
+                });
 
         return Collections.unmodifiableMap(result);
     }
@@ -151,6 +154,9 @@ public class DefaultConfigProvider implements ConfigProvider {
                     }
                 } else if (type.isInstance(value)) {
                     return type.cast(value);
+                } else if (value instanceof String) {
+                    // 尝试从字符串转换
+                    return convertFromString((String) value, type);
                 }
             }
             return null;
@@ -158,6 +164,24 @@ public class DefaultConfigProvider implements ConfigProvider {
             logger.warn("Failed to cast config value for key '{}': {}", key, e.getMessage());
             return null;
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T convertFromString(String value, Class<T> type) {
+        if (type == Integer.class || type == int.class) {
+            return (T) Integer.valueOf(value);
+        } else if (type == Long.class || type == long.class) {
+            return (T) Long.valueOf(value);
+        } else if (type == Double.class || type == double.class) {
+            return (T) Double.valueOf(value);
+        } else if (type == Float.class || type == float.class) {
+            return (T) Float.valueOf(value);
+        } else if (type == Boolean.class || type == boolean.class) {
+            return (T) Boolean.valueOf(value);
+        } else if (type == String.class) {
+            return (T) value;
+        }
+        return null;
     }
 
     private Class<?> getWrapperClass(Class<?> primitiveType) {

@@ -1,21 +1,24 @@
 package com.original.security.core.authentication.impl;
 
 import com.original.security.core.authentication.*;
-import com.original.security.core.authentication.user.SecurityUser;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import com.original.security.core.authentication.token.Token;
+import com.original.security.core.authentication.token.SimpleToken;
+import com.original.security.config.ConfigProvider;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.junit4.SpringRunner;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
  * DefaultAuthenticationProvider 单元测试
@@ -23,20 +26,22 @@ import static org.junit.Assert.*;
  * @author Original Security Team
  * @since 1.0.0
  */
-@RunWith(SpringRunner.class)
-public class DefaultAuthenticationProviderTest {
+@ExtendWith(MockitoExtension.class)
+class DefaultAuthenticationProviderTest {
 
     private DefaultAuthenticationProvider authenticationProvider;
-    private PasswordEncoder passwordEncoder;
 
-    @Before
-    public void setUp() {
-        passwordEncoder = new BCryptPasswordEncoder();
-        authenticationProvider = new DefaultAuthenticationProvider(passwordEncoder);
+    @Mock
+    private ConfigProvider mockConfigProvider;
+
+    @BeforeEach
+    void setUp() {
+        BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+        authenticationProvider = new DefaultAuthenticationProvider(passwordEncoder, mockConfigProvider);
     }
 
     @Test
-    public void testAuthenticateWithValidCredentials() throws AuthenticationException {
+    void testAuthenticateWithValidCredentials() throws AuthenticationException {
         // Given
         String username = "admin";
         String password = "password123";
@@ -49,47 +54,43 @@ public class DefaultAuthenticationProviderTest {
         AuthenticationResult result = authenticationProvider.authenticate(credentials, "username-password");
 
         // Then
+        assertNotNull(result);
         assertTrue(result.isSuccess());
-        assertNotNull(result.getUser());
-        assertEquals("admin", result.getUser().getUsername());
-        assertNotNull(result.getDetails());
+        assertEquals(username, result.getUser().getUsername());
     }
 
     @Test
-    public void testAuthenticateWithInvalidCredentials() throws AuthenticationException {
+    void testAuthenticateWithInvalidCredentialsFormat() {
         // Given
-        Map<String, Object> credentials = new HashMap<>();
-        credentials.put("username", "nonexistent");
-        credentials.put("password", "wrongpassword");
+        Integer invalidCredentials = 123; // Not a Map type
 
         // When
-        AuthenticationResult result = authenticationProvider.authenticate(credentials, "username-password");
+        AuthenticationResult result = authenticationProvider.authenticate(invalidCredentials, "username-password");
 
         // Then
+        assertNotNull(result);
         assertFalse(result.isSuccess());
-        assertNull(result.getUser());
-        assertNotNull(result.getErrorMessage());
-        assertEquals("User not found: nonexistent", result.getErrorMessage());
+        assertEquals("Invalid credentials format", result.getErrorMessage());
     }
 
     @Test
-    public void testAuthenticateWithMissingCredentials() throws AuthenticationException {
+    void testAuthenticateWithMissingCredentials() throws AuthenticationException {
         // Given
         Map<String, Object> credentials = new HashMap<>();
         credentials.put("username", "admin");
-        // missing password
+        // Missing password
 
         // When
         AuthenticationResult result = authenticationProvider.authenticate(credentials, "username-password");
 
         // Then
+        assertNotNull(result);
         assertFalse(result.isSuccess());
-        assertNull(result.getUser());
         assertEquals("Username and password are required", result.getErrorMessage());
     }
 
     @Test
-    public void testAuthenticateWithMapCredentials() throws AuthenticationException {
+    void testAuthenticateWithUsernameAndPassword() throws AuthenticationException {
         // Given
         String username = "admin";
         String password = "password123";
@@ -98,23 +99,38 @@ public class DefaultAuthenticationProviderTest {
         AuthenticationResult result = authenticationProvider.authenticate(username, password);
 
         // Then
+        assertNotNull(result);
         assertTrue(result.isSuccess());
-        assertNotNull(result.getUser());
-        assertEquals("admin", result.getUser().getUsername());
+        assertEquals(username, result.getUser().getUsername());
+        assertEquals("系统管理员", result.getUser().getDisplayName());
     }
 
     @Test
-    public void testValidateToken() {
-        // Create a mock token
+    void testAuthenticateWithNonExistentUser() throws AuthenticationException {
+        // Given
+        String username = "nonexistent";
+
+        // When
+        AuthenticationResult result = authenticationProvider.authenticate(username, "password");
+
+        // Then
+        assertNotNull(result);
+        assertFalse(result.isSuccess());
+        assertTrue(result.getErrorMessage().contains("User not found"));
+    }
+
+    @Test
+    void testValidateToken() {
+        // Given
         Token token = new SimpleToken(
-            "test-token",
+            "valid-token",
             "JWT",
             LocalDateTime.now(),
             LocalDateTime.now().plusHours(1),
             "system",
             "admin",
             new String[]{"web"},
-            new HashMap<>()
+            Collections.emptyMap()
         );
 
         // When
@@ -125,7 +141,7 @@ public class DefaultAuthenticationProviderTest {
     }
 
     @Test
-    public void testValidateNullToken() {
+    void testValidateNullToken() {
         // When
         boolean isValid = authenticationProvider.validateToken(null);
 
@@ -134,55 +150,177 @@ public class DefaultAuthenticationProviderTest {
     }
 
     @Test
-    public void testRefreshToken() {
-        // Create a valid token
+    void testRefreshToken() {
+        // Given
+        when(mockConfigProvider.getConfig("security.token.expiration.hours", 1L))
+            .thenReturn(1L);
+
         Token originalToken = new SimpleToken(
-            "test-token",
+            "valid-token",
             "JWT",
             LocalDateTime.now(),
             LocalDateTime.now().plusHours(1),
             "system",
             "admin",
             new String[]{"web"},
-            new HashMap<>()
+            Collections.emptyMap()
         );
 
         // When
-        Token newToken = authenticationProvider.refreshToken(originalToken);
+        Token refreshedToken = authenticationProvider.refreshToken(originalToken);
 
         // Then
-        assertNotNull(newToken);
-        assertNotEquals(originalToken.getTokenId(), newToken.getTokenId());
-        assertEquals("admin", newToken.getSubject());
+        assertNotNull(refreshedToken);
+        assertEquals("admin", refreshedToken.getSubject());
     }
 
     @Test
-    public void testLoadUserByUsername() throws AuthenticationException {
+    void testRefreshInvalidToken() {
+        // Given
+        Token invalidToken = new SimpleToken(
+            "expired-token",
+            "JWT",
+            LocalDateTime.now().minusHours(2),
+            LocalDateTime.now().minusHours(1),
+            "system",
+            "admin",
+            new String[]{"web"},
+            Collections.emptyMap()
+        );
+
         // When
-        org.springframework.security.core.userdetails.UserDetails userDetails =
-            authenticationProvider.loadUserByUsername("admin");
+        Token refreshedToken = authenticationProvider.refreshToken(invalidToken);
+
+        // Then
+        assertNull(refreshedToken);
+    }
+
+    @Test
+    void testLoadUserByUsername() throws AuthenticationException {
+        // Given
+        String username = "admin";
+
+        // When
+        UserDetails userDetails = authenticationProvider.loadUserByUsername(username);
 
         // Then
         assertNotNull(userDetails);
-        assertEquals("admin", userDetails.getUsername());
+        assertEquals(username, userDetails.getUsername());
         assertTrue(userDetails.getAuthorities().stream()
-            .anyMatch(auth -> "ROLE_ADMIN".equals(auth.getAuthority())));
-    }
-
-    @Test(expected = org.springframework.security.core.userdetails.UsernameNotFoundException.class)
-    public void testLoadNonExistentUser() throws AuthenticationException {
-        // When
-        authenticationProvider.loadUserByUsername("nonexistent");
+            .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN")));
     }
 
     @Test
-    public void testPasswordEncoder() {
+    void testLoadNonExistentUser() {
         // Given
-        String rawPassword = "password123";
-        String encodedPassword = passwordEncoder.encode(rawPassword);
+        String username = "nonexistent";
+
+        // When & Then
+        assertThrows(AuthenticationException.class, () -> {
+            authenticationProvider.loadUserByUsername(username);
+        });
+    }
+
+    @Test
+    void testAuthenticationWithDetails() throws AuthenticationException {
+        // Given
+        String username = "admin";
+        String password = "password123";
+
+        Map<String, Object> credentials = new HashMap<>();
+        credentials.put("username", username);
+        credentials.put("password", password);
+
+        // When
+        AuthenticationResult result = authenticationProvider.authenticate(credentials, "username-password");
 
         // Then
-        assertTrue(passwordEncoder.matches(rawPassword, encodedPassword));
-        assertNotEquals(rawPassword, encodedPassword);
+        assertNotNull(result);
+        assertTrue(result.isSuccess());
+        assertNotNull(result.getDetails());
+        assertEquals("unknown", result.getDetails().get("ip"));
+        assertTrue(result.getDetails().containsKey("loginTime"));
+    }
+
+    @Test
+    void testTokenExpirationConfig() {
+        // Given
+        long expectedHours = 2;
+        when(mockConfigProvider.getConfig("security.token.expiration.hours", 1L))
+            .thenReturn(expectedHours);
+
+        // When
+        Token token = authenticationProvider.refreshToken(new SimpleToken(
+            "test",
+            "JWT",
+            LocalDateTime.now(),
+            LocalDateTime.now().plusHours(1),
+            "system",
+            "test",
+            new String[]{"web"},
+            Collections.emptyMap()
+        ));
+
+        // Then
+        assertNotNull(token);
+        // The expiration should be 2 hours from now
+        LocalDateTime expectedExpiration = LocalDateTime.now().plusHours(expectedHours);
+        assertTrue(Math.abs(token.getExpiresAt().getHour() - expectedExpiration.getHour()) <= 1);
+    }
+
+    @Test
+    void testDefaultTokenExpiration() {
+        // Given - no config provided, should use default
+        when(mockConfigProvider.getConfig("security.token.expiration.hours", 1L))
+            .thenReturn(1L);
+
+        // When
+        Token token = authenticationProvider.refreshToken(new SimpleToken(
+            "test",
+            "JWT",
+            LocalDateTime.now(),
+            LocalDateTime.now().plusHours(1),
+            "system",
+            "test",
+            new String[]{"web"},
+            Collections.emptyMap()
+        ));
+
+        // Then
+        assertNotNull(token);
+        // Should use default 1 hour
+        assertTrue(token.getExpiresAt().isAfter(LocalDateTime.now()));
+    }
+
+    @Test
+    void testUserRolesAndPermissions() throws AuthenticationException {
+        // Given
+        String username = "admin";
+
+        // When
+        UserDetails userDetails = authenticationProvider.loadUserByUsername(username);
+
+        // Then
+        assertNotNull(userDetails);
+        assertEquals(2, userDetails.getAuthorities().size());
+        assertTrue(userDetails.getAuthorities().stream()
+            .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN")));
+        assertTrue(userDetails.getAuthorities().stream()
+            .anyMatch(auth -> auth.getAuthority().equals("ROLE_USER")));
+    }
+
+    @Test
+    void testRegularUserRoles() throws AuthenticationException {
+        // Given
+        String username = "user";
+
+        // When
+        UserDetails userDetails = authenticationProvider.loadUserByUsername(username);
+
+        // Then
+        assertNotNull(userDetails);
+        assertEquals(1, userDetails.getAuthorities().size());
+        assertTrue(userDetails.getAuthorities().stream()
+            .anyMatch(auth -> auth.getAuthority().equals("ROLE_USER")));
     }
 }

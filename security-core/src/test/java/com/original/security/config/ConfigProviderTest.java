@@ -1,14 +1,17 @@
 package com.original.security.config;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.springframework.test.context.junit4.SpringRunner;
+import com.original.security.config.impl.DefaultConfigProvider;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * ConfigProvider 单元测试
@@ -16,96 +19,168 @@ import static org.junit.Assert.*;
  * @author Original Security Team
  * @since 1.0.0
  */
-@RunWith(SpringRunner.class)
-public class ConfigProviderTest {
+@ExtendWith(SpringExtension.class)
+class ConfigProviderTest {
 
-    private ConfigProvider configProvider;
+    private DefaultConfigProvider configProvider;
 
-    @Before
-    public void setUp() {
-        Map<String, Object> configMap = new HashMap<>();
-        configMap.put("app.name", "Spring Security Boot");
-        configMap.put("app.version", "1.0.0");
-        configMap.put("security.jwt.enabled", true);
-        configMap.put("security.jwt.expiration", 3600);
-
-        configProvider = new DefaultConfigProvider(configMap);
+    @BeforeEach
+    void setUp() {
+        configProvider = new DefaultConfigProvider();
     }
 
     @Test
-    public void testGetConfig() {
-        String appName = configProvider.getConfig("app.name").orElse(null);
-        assertEquals("Spring Security Boot", appName);
+    void testGetConfig() {
+        configProvider.addConfig("test.key", "test.value");
 
-        String nonExistentKey = configProvider.getConfig("non.existent").orElse(null);
-        assertNull(nonExistentKey);
+        Optional<String> value = configProvider.getConfig("test.key");
+        assertTrue(value.isPresent());
+        assertEquals("test.value", value.get());
     }
 
     @Test
-    public void testGetConfigWithDefault() {
-        String version = configProvider.getConfig("app.version", "1.0.0");
-        assertEquals("1.0.0", version);
+    void testGetConfigWithDefault() {
+        configProvider.addConfig("test.key", "test.value");
 
-        String nonExistentKey = configProvider.getConfig("non.existent", "default-value");
-        assertEquals("default-value", nonExistentKey);
+        String value = configProvider.getConfig("test.key", "default");
+        assertEquals("test.value", value);
     }
 
     @Test
-    public void testGetProperties() {
-        Map<String, Object> appProperties = configProvider.getProperties("app.");
-        assertEquals(2, appProperties.size());
-        assertEquals("Spring Security Boot", appProperties.get("app.name"));
-        assertEquals("1.0.0", appProperties.get("app.version"));
+    void testGetConfigNonExistent() {
+        Optional<String> value = configProvider.getConfig("non.existent");
+        assertFalse(value.isPresent());
     }
 
     @Test
-    public void testGetAllProperties() {
-        Map<String, Object> allProperties = configProvider.getAllProperties();
-        assertEquals(4, allProperties.size());
-        assertTrue(allProperties.containsKey("app.name"));
-        assertTrue(allProperties.containsKey("app.version"));
-        assertTrue(allProperties.containsKey("security.jwt.enabled"));
-        assertTrue(allProperties.containsKey("security.jwt.expiration"));
+    void testGetConfigWithDefaultForNonExistent() {
+        String value = configProvider.getConfig("non.existent", "default");
+        assertEquals("default", value);
     }
 
     @Test
-    public void testHasConfig() {
-        assertTrue(configProvider.hasConfig("app.name"));
+    void testGetProperties() {
+        configProvider.addConfig("app.name", "Spring Security Boot");
+        configProvider.addConfig("app.version", "1.0.0");
+        configProvider.addConfig("db.url", "jdbc:mysql://localhost:3306/mydb");
+
+        Map<String, Object> appProps = configProvider.getProperties("app.");
+        assertEquals(2, appProps.size());
+        assertEquals("Spring Security Boot", appProps.get("name"));
+        assertEquals("1.0.0", appProps.get("version"));
+    }
+
+    @Test
+    void testGetAllProperties() {
+        configProvider.addConfig("key1", "value1");
+        configProvider.addConfig("key2", "value2");
+
+        Map<String, Object> allProps = configProvider.getAllProperties();
+        assertEquals(2, allProps.size());
+        assertEquals("value1", allProps.get("key1"));
+        assertEquals("value2", allProps.get("key2"));
+    }
+
+    @Test
+    void testHasConfig() {
         assertFalse(configProvider.hasConfig("non.existent"));
+
+        configProvider.addConfig("existing.key", "value");
+        assertTrue(configProvider.hasConfig("existing.key"));
     }
 
     @Test
-    public void testCheckConfig() {
-        assertTrue(configProvider.checkConfig("app.name", name -> "Spring Security Boot".equals(name)));
-        assertFalse(configProvider.checkConfig("app.name", name -> "Other App".equals(name)));
-        assertFalse(configProvider.checkConfig("non.existent", value -> true));
+    void testCheckConfig() {
+        configProvider.addConfig("env", "development");
+
+        boolean isDev = configProvider.checkConfig("env", env -> "development".equals(env));
+        assertTrue(isDev);
+
+        boolean isProd = configProvider.checkConfig("env", env -> "production".equals(env));
+        assertFalse(isProd);
     }
 
     @Test
-    public void testGetString() {
-        assertEquals("Spring Security Boot", configProvider.getString("app.name"));
-        assertEquals("", configProvider.getString("non.existent"));
+    void testGetString() {
+        configProvider.addConfig("string.key", "hello world");
+
+        String value = configProvider.getString("string.key");
+        assertEquals("hello world", value);
     }
 
     @Test
-    public void testGetConfigAs() {
-        Boolean enabled = configProvider.getConfigAs("security.jwt.enabled", Boolean.class);
-        assertTrue(enabled);
+    void testGetStringNullable() {
+        configProvider.addConfig("string.key", "not null");
 
-        Integer expiration = configProvider.getConfigAs("security.jwt.expiration", Integer.class);
-        assertEquals(3600, expiration.intValue());
+        String value = configProvider.getStringNullable("string.key");
+        assertEquals("not null", value);
+
+        String nullValue = configProvider.getStringNullable("non.existent");
+        assertNull(nullValue);
     }
 
     @Test
-    public void testSourceInfo() {
-        assertNotNull(configProvider.getSourceInfo());
-        assertTrue(configProvider.getSourceInfo().contains("DefaultConfigProvider"));
+    void testGetConfigAs() {
+        configProvider.addConfig("number.key", "123");
+
+        Integer value = configProvider.getConfigAs("number.key", Integer.class);
+        assertNotNull(value);
+        assertEquals(123, value.intValue());
     }
 
     @Test
-    public void testDefaultConstructor() {
-        ConfigProvider defaultConfig = new DefaultConfigProvider();
-        assertNotNull(defaultConfig);
-        assertEquals(0, defaultConfig.getAllProperties().size());
+    void testRefresh() {
+        configProvider.addConfig("initial.key", "initial");
+
+        // Modify the underlying config map directly for testing
+        Map<String, Object> testMap = new HashMap<>();
+        testMap.put("new.key", "new value");
+
+        // Create a new provider with the test map
+        DefaultConfigProvider newProvider = new DefaultConfigProvider(testMap, "test");
+
+        newProvider.refresh(); // Should not throw any exceptions
+        assertEquals("new value", newProvider.getString("new.key"));
+    }
+
+    @Test
+    void testSourceInfo() {
+        DefaultConfigProvider provider = new DefaultConfigProvider();
+        assertNotNull(provider.getSourceInfo());
+        assertTrue(provider.getSourceInfo().contains("DefaultConfigProvider"));
+    }
+
+    @Test
+    void testConstructorWithCustomMap() {
+        Map<String, Object> initialMap = new HashMap<>();
+        initialMap.put("custom.key", "custom.value");
+
+        DefaultConfigProvider provider = new DefaultConfigProvider(initialMap, "custom source");
+        assertEquals("custom.value", provider.getString("custom.key"));
+        assertEquals("custom source", provider.getSourceInfo());
+    }
+
+    @Test
+    void testAddConfigNullKey() {
+        assertDoesNotThrow(() -> {
+            configProvider.addConfig(null, "value");
+        });
+    }
+
+    @Test
+    void testAddConfigEmptyKey() {
+        assertDoesNotThrow(() -> {
+            configProvider.addConfig("", "value");
+        });
+    }
+
+    @Test
+    void testAddConfigValidKey() {
+        assertDoesNotThrow(() -> {
+            configProvider.addConfig("valid.key", "value");
+        });
+
+        String value = configProvider.getString("valid.key");
+        assertEquals("value", value);
     }
 }

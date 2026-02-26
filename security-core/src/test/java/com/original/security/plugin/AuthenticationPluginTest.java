@@ -4,6 +4,7 @@ import com.original.security.core.authentication.AuthenticationProvider;
 import com.original.security.core.authentication.impl.DefaultAuthenticationProvider;
 import com.original.security.config.ConfigProvider;
 import com.original.security.config.impl.DefaultConfigProvider;
+import com.original.security.plugin.impl.DefaultAuthenticationPlugin;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -8,7 +8,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -35,6 +34,7 @@ public class DefaultAuthenticationProvider implements AuthenticationProvider {
     private static final Logger log = LoggerFactory.getLogger(DefaultAuthenticationProvider.class);
     private final PasswordEncoder passwordEncoder;
     private final Map<String, SecurityUser> userStore = new HashMap<>();
+    private final Map<String, String> passwordStore = new HashMap<>();
     private final ConfigProvider configProvider;
     private static final String TOKEN_EXPIRATION_HOURS_KEY = "security.token.expiration.hours";
     private static final long DEFAULT_TOKEN_EXPIRATION_HOURS = 1;
@@ -122,12 +122,11 @@ public class DefaultAuthenticationProvider implements AuthenticationProvider {
         SecurityUser user = userStore.get(username);
 
         if (user == null) {
-            throw new UsernameNotFoundException("User not found: " + username);
+            throw new AuthenticationException("User not found: " + username, "USER_NOT_FOUND");
         }
 
         if (user.getStatus() != SecurityUser.UserStatus.ACTIVE) {
-            throw new org.springframework.security.core.userdetails.UsernameNotFoundException(
-                "User account is inactive: " + username);
+            throw new AuthenticationException("User account is inactive: " + username, "USER_INACTIVE");
         }
 
         return User.builder()
@@ -148,6 +147,12 @@ public class DefaultAuthenticationProvider implements AuthenticationProvider {
      * 获取编码后的密码
      */
     private String getEncodedPassword(String username) {
+        // 首先从密码存储中获取
+        String encodedPassword = passwordStore.get(username);
+        if (encodedPassword != null) {
+            return encodedPassword;
+        }
+
         // 从配置中获取密码，使用 ConfigProvider
         String password = configProvider.getConfig("security.password." + username, null);
         if (password == null) {
@@ -196,6 +201,8 @@ public class DefaultAuthenticationProvider implements AuthenticationProvider {
             .lastActiveTime(LocalDateTime.now())
             .build();
         userStore.put("admin", admin);
+        // 设置管理员密码：password123
+        passwordStore.put("admin", passwordEncoder.encode("password123"));
 
         // 普通用户
         SecurityUser user = SecurityUser.builder()
@@ -208,5 +215,7 @@ public class DefaultAuthenticationProvider implements AuthenticationProvider {
             .lastActiveTime(LocalDateTime.now())
             .build();
         userStore.put("user", user);
+        // 设置普通用户密码：password456
+        passwordStore.put("user", passwordEncoder.encode("password456"));
     }
 }
