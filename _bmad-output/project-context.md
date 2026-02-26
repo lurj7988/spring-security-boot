@@ -105,7 +105,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - 测试类命名：{ClassName}Test.java
 
 **测试框架：**
-- 单元测试：JUnit 4 (Spring Boot 2.x 默认)
+- 单元测试：JUnit 5 (Jupiter) - 本项目实际使用
 - Mock 框架：Mockito
 - Spring 测试：@SpringBootTest, @WebMvcTest, @MockBean
 

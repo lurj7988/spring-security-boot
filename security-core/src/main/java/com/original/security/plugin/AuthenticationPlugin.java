@@ -1,6 +1,7 @@
 package com.original.security.plugin;
 
 import com.original.security.core.authentication.AuthenticationProvider;
+import org.springframework.lang.Nullable;
 
 /**
  * 认证插件接口
@@ -25,13 +26,14 @@ public interface AuthenticationPlugin {
      *
      * @return AuthenticationProvider 实现，提供实际的认证逻辑
      */
+    @Nullable
     AuthenticationProvider getAuthenticationProvider();
 
     /**
      * 检查该插件是否支持指定的认证类型
      *
-     * @param authenticationType 认证类型
-     * @return true 表示支持该认证类型，false 表示不支持
+     * @param authenticationType 认证类型，可以为 null
+     * @return true 表示支持该认证类型，false 表示不支持或类型为 null
      */
-    boolean supports(Class<?> authenticationType);
+    boolean supports(@Nullable Class<?> authenticationType);
 }

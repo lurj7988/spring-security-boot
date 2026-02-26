@@ -1,6 +1,7 @@
 package com.original.security.plugin;
 
 import com.original.security.core.authentication.AuthenticationProvider;
+import com.original.security.core.authentication.JwtAuthenticationToken;
 import com.original.security.core.authentication.impl.DefaultAuthenticationProvider;
 import com.original.security.config.ConfigProvider;
 import com.original.security.config.impl.DefaultConfigProvider;
@@ -11,7 +12,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
+import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -55,6 +60,12 @@ class AuthenticationPluginTest {
     }
 
     @Test
+    void testSupportsJwtAuthenticationToken() {
+        // 验证插件支持 JWT 认证类型
+        assertTrue(authenticationPlugin.supports(JwtAuthenticationToken.class));
+    }
+
+    @Test
     void testSupportsNull() {
         assertFalse(authenticationPlugin.supports(null));
     }
@@ -94,5 +105,34 @@ class AuthenticationPluginTest {
 
         assertEquals("jwt-authentication", plugin.getName());
         assertNotNull(plugin.getAuthenticationProvider());
+    }
+
+    @Test
+    void testJwtAuthenticationTokenCreation() {
+        // 测试实际创建和使用 JWT 认证令牌
+        String jwtToken = "test.jwt.token";
+        UserDetails userDetails = User.withUsername("testuser")
+            .password("password")
+            .roles("USER")
+            .build();
+
+        JwtAuthenticationToken jwtAuth = new JwtAuthenticationToken(jwtToken, userDetails);
+
+        assertEquals(jwtToken, jwtAuth.getToken());
+        assertEquals(userDetails, jwtAuth.getPrincipal());
+        assertTrue(jwtAuth.isAuthenticated());
+        assertTrue(jwtAuth.isValid());
+    }
+
+    @Test
+    void testJwtAuthenticationTokenWithoutUserDetails() {
+        // 测试没有用户详情的 JWT 认证令牌
+        String jwtToken = "test.jwt.token";
+        JwtAuthenticationToken jwtAuth = new JwtAuthenticationToken(jwtToken);
+
+        assertEquals(jwtToken, jwtAuth.getToken());
+        assertNull(jwtAuth.getPrincipal());
+        assertFalse(jwtAuth.isAuthenticated());
+        assertFalse(jwtAuth.isValid());
     }
 }

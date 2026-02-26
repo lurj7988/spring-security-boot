@@ -188,6 +188,11 @@ public class DefaultAuthenticationProvider implements AuthenticationProvider {
 
     /**
      * 初始化默认用户
+     * <p>
+     * 注意：默认密码必须通过配置提供者获取，禁止硬编码。
+     * 如果配置中没有提供密码，系统将使用随机生成的临时密码（仅用于开发/测试环境）
+     *
+     * @see #getEncodedPassword(String)
      */
     private void initDefaultUsers() {
         // 管理员用户
@@ -201,8 +206,8 @@ public class DefaultAuthenticationProvider implements AuthenticationProvider {
             .lastActiveTime(LocalDateTime.now())
             .build();
         userStore.put("admin", admin);
-        // 设置管理员密码：password123
-        passwordStore.put("admin", passwordEncoder.encode("password123"));
+        // 管理员密码从配置读取或使用随机临时密码
+        initUserPassword("admin");
 
         // 普通用户
         SecurityUser user = SecurityUser.builder()
@@ -215,7 +220,27 @@ public class DefaultAuthenticationProvider implements AuthenticationProvider {
             .lastActiveTime(LocalDateTime.now())
             .build();
         userStore.put("user", user);
-        // 设置普通用户密码：password456
-        passwordStore.put("user", passwordEncoder.encode("password456"));
+        // 普通用户密码从配置读取或使用随机临时密码
+        initUserPassword("user");
+    }
+
+    /**
+     * 初始化用户密码
+     * <p>
+     * 从配置中获取用户密码，如果未配置则生成随机临时密码。
+     * 随机密码仅用于开发/测试环境，生产环境必须配置密码。
+     *
+     * @param username 用户名
+     */
+    private void initUserPassword(String username) {
+        String password = configProvider.getConfig("security.password." + username, null);
+        if (password == null) {
+            // 开发/测试环境：生成随机临时密码
+            password = UUID.randomUUID().toString().substring(0, 16);
+            log.warn("⚠️  SECURITY WARNING: No password configured for user '{}'. Generated temporary password: '{}' (仅用于演示)",
+                     username, password);
+            log.warn("请在生产环境中通过配置 'security.password.{}' 设置安全密码", username);
+        }
+        passwordStore.put(username, passwordEncoder.encode(password));
     }
 }

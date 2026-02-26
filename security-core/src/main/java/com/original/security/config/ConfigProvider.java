@@ -11,6 +11,33 @@ import org.springframework.lang.Nullable;
  * ConfigProvider 提供统一的配置访问抽象，
  * 支持从多种配置源（数据库、配置文件等）加载配置
  *
+ * <h3>配置源扩展</h3>
+ * <p>
+ * 本接口支持多种配置源扩展实现：
+ *
+ * <ul>
+ *   <li><b>数据库配置源</b>：实现 ConfigProvider 接口，从数据库表读取配置
+ *       <pre>
+ *       public class DatabaseConfigProvider implements ConfigProvider {
+ *           private final DataSource dataSource;
+ *           // 实现从数据库加载配置的逻辑
+ *       }
+ *       </pre>
+ *   </li>
+ *   <li><b>配置文件源</b>：实现 ConfigProvider 接口，从 properties/yaml 文件读取配置
+ *       <pre>
+ *       public class FileConfigProvider implements ConfigProvider {
+ *           private final Properties properties;
+ *           // 实现从文件加载配置的逻辑
+ *       }
+ *       </pre>
+ *   </li>
+ *   <li><b>环境变量源</b>：实现 ConfigProvider 接口，从系统环境变量读取配置
+ *   </li>
+ *   <li><b>远程配置源</b>：实现 ConfigProvider 接口，从远程配置中心读取配置
+ *   </li>
+ * </ul>
+ *
  * @author Original Security Team
  * @since 1.0.0
  */

@@ -224,10 +224,10 @@ public class DefaultConfigProvider implements ConfigProvider {
     }
 
     /**
-     * 添加配置项
+     * 获取配置值的原始字符串形式，如果不存在则为 null
      *
      * @param key 配置键
-     * @param value 配置值
+     * @return 配置值的字符串形式，如果不存在则为 null
      */
     @Override
     @Nullable

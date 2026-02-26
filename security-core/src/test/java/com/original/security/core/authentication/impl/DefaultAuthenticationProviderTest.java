@@ -19,6 +19,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import org.mockito.stubbing.Answer;
 
 /**
  * DefaultAuthenticationProvider 单元测试
@@ -37,6 +38,14 @@ class DefaultAuthenticationProviderTest {
     @BeforeEach
     void setUp() {
         BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+        // 配置测试密码 - 使用 lenient() 以避免不必要的 stubbing 错误
+        lenient().when(mockConfigProvider.getConfig("security.password.admin", null))
+            .thenReturn("password123");
+        lenient().when(mockConfigProvider.getConfig("security.password.user", null))
+            .thenReturn("password456");
+        lenient().when(mockConfigProvider.getConfig("security.token.expiration.hours", 1L))
+            .thenReturn(1L);
+
         authenticationProvider = new DefaultAuthenticationProvider(passwordEncoder, mockConfigProvider);
     }
 
