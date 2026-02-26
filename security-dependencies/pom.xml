@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.original.frame</groupId>
+    <artifactId>security-dependencies</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>Security Dependencies</name>
+    <description>Security Dependencies - Centralized version management for all modules</description>
+
+    <properties>
+        <jdk.version>1.8</jdk.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- ========== Third-party Libraries ========== -->
+        <!-- Apache Commons -->
+        <commons-io.version>2.15.1</commons-io.version>
+        <commons-lang3.version>3.14.0</commons-lang3.version>
+
+        <!-- Security & Crypto -->
+        <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
+        <bouncycastle.version>1.70</bouncycastle.version>
+
+        <!-- Legacy Libraries -->
+        <truelicense.version>1.33</truelicense.version>
+
+        <!-- ========== Database Drivers ========== -->
+        <mysql-connector.version>8.0.33</mysql-connector.version>
+        <h2.version>2.2.224</h2.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- ========== Apache Commons ========== -->
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>${commons-io.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>${commons-lang3.version}</version>
+            </dependency>
+
+            <!-- ========== Security & Crypto ========== -->
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk15on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+
+            <!-- ========== Database Drivers ========== -->
+            <dependency>
+                <groupId>com.mysql</groupId>
+                <artifactId>mysql-connector-j</artifactId>
+                <version>${mysql-connector.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.h2database</groupId>
+                <artifactId>h2</artifactId>
+                <version>${h2.version}</version>
+            </dependency>
+
+            <!-- ========== Project Modules ========== -->
+            <dependency>
+                <groupId>com.original.frame</groupId>
+                <artifactId>security-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.original.frame</groupId>
+                <artifactId>security-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- User Module -->
+            <dependency>
+                <groupId>com.original.frame</groupId>
+                <artifactId>security-user-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.original.frame</groupId>
+                <artifactId>security-user-impl</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- Config Module -->
+            <dependency>
+                <groupId>com.original.frame</groupId>
+                <artifactId>security-config-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.original.frame</groupId>
+                <artifactId>security-config-impl</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+        </dependencies>
+    </dependencyManagement>
+</project>
