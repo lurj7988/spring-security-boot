@@ -140,8 +140,6 @@ security-core/src/test/java/com/original/security/core/authentication/impl/Defau
 security-core/src/test/java/com/original/security/core/authentication/user/SecurityUserTest.java
 security-core/src/test/java/com/original/security/plugin/AuthenticationPluginTest.java
 security-core/src/test/resources/META-INF/junit-platform.properties
-_bmad-output/planning-artifacts/0-1-define-core-interfaces-specification.md
-_bmad-output/implementation-artifacts/code-reports/0-1-define-core-interfaces-adversarial-review.md
 ```
 
 ### Change Log

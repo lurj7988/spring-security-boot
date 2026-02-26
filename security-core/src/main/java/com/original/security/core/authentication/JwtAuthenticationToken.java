@@ -1,10 +1,7 @@
 package com.original.security.core.authentication;
 
 import org.springframework.security.authentication.AbstractAuthenticationToken;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-
-import java.util.Collection;
 
 /**
  * JWT 认证令牌
