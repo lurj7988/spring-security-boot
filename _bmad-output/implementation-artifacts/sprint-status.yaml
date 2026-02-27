@@ -43,7 +43,7 @@ development_status:
   # Epic 0: 项目启动与数据基础
   epic-0: in-progress
   0-1-define-core-interfaces: done
-  0-2-create-core-tables: backlog
+  0-2-create-core-tables: done
   epic-0-retrospective: optional
 
   # Epic 1: 框架基础与核心认证
