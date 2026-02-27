@@ -1,0 +1,105 @@
+package com.original.security.config;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+
+/**
+ * Spring Security Boot 核心自动配置类。
+ * <p>
+ * 该类由 {@link com.original.security.annotation.EnableSecurityBoot} 注解导入加载。
+ * 负责提供安全框架所需的基础核心 Bean，包括：
+ * <ul>
+ *     <li>{@link PasswordEncoder}: 默认使用符合安全规范的 BCryptPasswordEncoder</li>
+ *     <li>{@link AuthenticationManager}: 暴露核心认证管理器</li>
+ *     <li>{@link SecurityFilterChain}: 配置默认的基础拦截链，提供无状态(Stateless)等基础支撑</li>
+ * </ul>
+ */
+@Configuration
+@EnableWebSecurity
+public class SecurityAutoConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(SecurityAutoConfiguration.class);
+
+    /**
+     * 最大 BCrypt 强度（根据项目规范和环境性能可能会有所不同，此处提供默认强度 10）
+     */
+    private static final int DEFAULT_PASSWORD_STRENGTH = 10;
+
+    /**
+     * 实例化密码编码器。
+     * 默认采用 BCrypt 加密算法以符合安全需求。
+     * <p>
+     * 使用 {@code @ConditionalOnMissingBean} 以便当用户在上下文中提供自定义配置时自动退让。
+     *
+     * @return 实例化的 PasswordEncoder
+     */
+    @Bean
+    @ConditionalOnMissingBean(PasswordEncoder.class)
+    public PasswordEncoder passwordEncoder() {
+        log.info("Security auto-configuration: Registering default BCryptPasswordEncoder with strength {}", DEFAULT_PASSWORD_STRENGTH);
+        return new BCryptPasswordEncoder(DEFAULT_PASSWORD_STRENGTH);
+    }
+
+    /**
+     * 注册认证管理器 AuthenticationManager。
+     * 通过 Spring Security 的 AuthenticationConfiguration 直接获取。
+     *
+     * @param authenticationConfiguration Security 注入的认证配置
+     * @return 实例化的 AuthenticationManager
+     * @throws Exception 如果获取失败抛出异常
+     */
+    @Bean
+    @ConditionalOnMissingBean(AuthenticationManager.class)
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+        log.info("Security auto-configuration: Registering AuthenticationManager");
+        return authenticationConfiguration.getAuthenticationManager();
+    }
+
+    /**
+     * 构建并在容器中装配默认的 SecurityFilterChain。
+     * <ul>
+     *     <li>禁用默认的表单登录和 Basic 认证（后续由插件式架构接管）</li>
+     *     <li>将 Session 会话管理策略配置为 STATELESS，以支持 API 无状态特性或 JWT</li>
+     *     <li>为后续的网络安全配置（如 CORS、CSRF）预留口子</li>
+     * </ul>
+     *
+     * @param http HttpSecurity 构建器
+     * @return 构建完毕的 SecurityFilterChain
+     * @throws Exception 如果配置过程中出错
+     */
+    @Bean
+    @ConditionalOnMissingBean(SecurityFilterChain.class)
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        log.info("Security auto-configuration: Initializing basic SecurityFilterChain");
+        
+        http
+            // 暂时禁用默认的跨站请求伪造保护（后续 CSRF Auto Config 会接管）
+            .csrf().disable()
+            // 暂时禁用跨域配置（后续 CORS Auto Config 会接管）
+            .cors().disable()
+            // 禁用基础认证和表单登录
+            .httpBasic().disable()
+            .formLogin().disable()
+            .logout().disable()
+            // 设置默认的会话策略为无状态，因为框架将主要基于 Token (如 JWT)
+            .sessionManagement()
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            .and()
+            // 所有请求都需要认证（默认极简策略），由应用自定义更详细的权限放行
+            .authorizeHttpRequests()
+                .anyRequest().authenticated();
+            
+        return http.build();
+    }
+}
