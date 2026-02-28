@@ -19,15 +19,18 @@ _This file contains critical rules and patterns that AI agents must follow when 
 ## 技术栈与版本
 
 **核心框架：**
+
 - Java 1.8
 - Spring Boot 2.7.18
 - Spring Security 5.7.11
 - Spring Cloud Alibaba 2021.0.5.0
 
 **数据库：**
-- MySQL (用于 OAuth2 服务)
+
+- MySQL (用于 OAuth2 服务) 默认地址：192.168.220.236:3306 用户名：root 密码：Gepoint
 
 **关键库版本：**
+
 - Jackson (Spring Boot 默认 JSON 库)
 - commons-io 2.2
 - bcprov-jdk15on 1.69 (加密)
@@ -35,6 +38,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Spring Session 1.3.3.RELEASE
 
 **构建工具：**
+
 - Maven 3.x
 - maven-compiler-plugin 3.8.0
 
@@ -45,19 +49,23 @@ _This file contains critical rules and patterns that AI agents must follow when 
 ### 语言特定规则
 
 **依赖注入：**
+
 - 必须使用**构造器依赖注入**，禁止使用字段注入（@Autowired on fields）
 - 所有依赖通过构造器参数声明并赋值给 final 字段
 
 **组合注解：**
+
 - 使用 @Import 将多个配置类组合到自定义注解中
 - 框架提供三个核心组合注解：@EnableFrameAuthorizationServer、@EnableFrameResourceServer、@EnableAlibabaCloud
 
 **JSON 序列化：**
+
 - 统一使用 Jackson（Spring Boot 默认）
 - Response.toString() 使用 ObjectMapper.writeValueAsString()
 - Security 处理器使用 ObjectMapper.readValue() 进行 JSON 解析
 
 **接口实现位置：**
+
 - -api 模块：定义 Feign 客户端接口（@FeignClient）
 - -impl 模块：实现接口并添加 @RestController 和 @RequestMapping
 - 实现类直接实现接口，无需单独的 controller 类
@@ -67,31 +75,37 @@ _This file contains critical rules and patterns that AI agents must follow when 
 ### 框架特定规则
 
 **Spring Security 自定义处理器：**
+
 - 认证成功/失败处理器位于 security-core/src/main/java/com/original/frame/security/handler/
 - 处理器必须实现对应的 Spring Security 接口（如 AuthenticationSuccessHandler）
 - 处理器通过构造器接收 ObjectMapper 依赖进行 JSON 响应写入
 - 响应格式统一使用 Response.successBuilder(data).build() 模式
 
 **多认证提供者模式：**
+
 - 框架支持多个 AuthenticationProvider 实现
 - 认证类型：JWT、用户名密码、短信验证码、移动设备
 - 自定义认证提供者需要继承 AuthenticationProvider 并实现 authenticate() 方法
 
 **Feign OAuth2 集成：**
+
 - 使用 @EnableAlibabaCloud 注解启用服务发现和 Feign 客户端
 - FeignClientRequestInterceptor 自动添加 OAuth2 Bearer token 到服务间请求
 
 **模块架构模式：**
+
 - 父 POM 管理依赖版本
 - 子模块遵循 security-xxx 命名规范
 - 组件模块采用 API-Impl-Controller 三层架构
 
 **响应对象模式：**
+
 - 所有 API 响应使用 Response<T> 构建器模式
 - 成功响应：Response.successBuilder(data).build()
 - 错误响应：Response.errorBuilder(data).build()
 
 **密码编码：**
+
 - 使用 BCryptPasswordEncoder 进行密码加密
 
 ---
@@ -101,10 +115,12 @@ _This file contains critical rules and patterns that AI agents must follow when 
 **⚠️ 当前状态：零测试覆盖** - 这是一个安全框架项目，零测试覆盖是高风险状态
 
 **测试组织：**
+
 - 测试类应放在对应模块的 src/test/java 目录下
 - 测试类命名：{ClassName}Test.java
 
 **测试框架：**
+
 - 单元测试：JUnit 5 (Jupiter) - 本项目实际使用
 - Mock 框架：Mockito
 - Spring 测试：@SpringBootTest, @WebMvcTest, @MockBean
@@ -124,12 +140,14 @@ _This file contains critical rules and patterns that AI agents must follow when 
 **命名规范：** 类名 PascalCase，方法名 camelCase，常量 UPPER_SNAKE_CASE
 
 **强制规则：**
+
 - 使用构造器依赖注入
 - 不在生产代码中使用 printStackTrace()
 - 不使用魔法值，定义为常量
 - 公共 API 必须有 JavaDoc
 
 **代码审查检查清单：**
+
 - [ ] 使用构造器注入
 - [ ] 方法长度 < 50 行
 - [ ] 异常被正确处理（使用日志框架）
@@ -141,6 +159,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 ### 开发工作流规则
 
 **Maven 构建规范：**
+
 ```bash
 mvn clean install                                # 构建整个项目
 mvn clean install -pl {module}                   # 构建特定模块
@@ -148,13 +167,15 @@ mvn test                                        # 运行测试
 ```
 
 **服务启动顺序：**
+
 1. AuthorizationApplication (端口 3001)
 2. ConfigApplication (端口 3002)
 3. UserApplication (端口 3003)
 
-**Git 分支策略：** main (生产), feature/* (功能), hotfix/* (紧急修复)
+**Git 分支策略：** main (生产), feature/*(功能), hotfix/* (紧急修复)
 
 **提交信息规范（Conventional Commits）：**
+
 ```
 <type>(<scope>): <subject>
 类型：feat/fix/refactor/test/docs/chore
@@ -162,6 +183,7 @@ mvn test                                        # 运行测试
 ```
 
 **"完成的定义"：**
+
 - 代码实现完成
 - 代码审查通过
 - 所有测试通过
@@ -174,6 +196,7 @@ mvn test                                        # 运行测试
 **安全相关：** 密码必须使用 BCryptPasswordEncoder 加密、敏感信息不能记录到日志
 
 **常见错误：**
+
 - ❌ 使用字段注入而非构造器注入
 - ❌ 在生产代码中使用 printStackTrace()
 - ❌ 硬编码配置值
@@ -185,12 +208,14 @@ mvn test                                        # 运行测试
 ## 使用指南
 
 **对于 AI 代理：**
+
 - 在实现任何代码之前阅读此文件
 - 严格按照文档记录的规则遵循
 - 当有疑问时，选择更严格的选项
 - 如果出现新模式，更新此文件
 
 **对于人类：**
+
 - 保持此文件精简，专注于代理需求
 - 技术栈变更时更新
 - 每季度审查以优化和删除过时规则
