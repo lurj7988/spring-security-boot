@@ -2,6 +2,12 @@
 
 This file contains critical rules for AI agents working on the spring-security-boot project.
 
+## Communication Language
+
+- ✅ **使用中文与用户交互** - 所有面向用户的响应和交流必须使用中文
+- ✅ 代码注释和文档可以使用中英文混合
+- ✅ 技术术语保持英文（如 Maven, Spring Boot, JWT 等）
+
 ## Quick Reference
 
 - **Language:** Java 1.8

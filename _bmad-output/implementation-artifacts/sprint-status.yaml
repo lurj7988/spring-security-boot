@@ -1,4 +1,4 @@
-# generated: 2026-02-25
+# generated: 2026-02-28
 # project: spring-security-boot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -51,7 +51,7 @@ development_status:
   1-1-config-validation-startup-check: done
   1-3-enable-security-boot-annotation: done
   1-4-username-password-authentication: done
-  1-5-jwt-authentication-plugin: backlog
+  1-5-jwt-authentication-plugin: done
   1-6-default-authentication-endpoints: backlog
   epic-1-retrospective: optional
 

@@ -2,6 +2,7 @@ package com.original.security.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +14,8 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import com.original.security.filter.JwtAuthenticationFilter;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
  * Spring Security Boot 核心自动配置类。
@@ -80,7 +83,7 @@ public class SecurityAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(SecurityFilterChain.class)
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectProvider<JwtAuthenticationFilter> jwtFilterProvider) throws Exception {
         log.info("Security auto-configuration: Initializing basic SecurityFilterChain");
         
         http
@@ -99,6 +102,12 @@ public class SecurityAutoConfiguration {
             // 所有请求都需要认证（默认极简策略），由应用自定义更详细的权限放行
             .authorizeHttpRequests()
                 .anyRequest().authenticated();
+            
+        JwtAuthenticationFilter jwtFilter = jwtFilterProvider.getIfAvailable();
+        if (jwtFilter != null) {
+            log.info("Security auto-configuration: Registering JwtAuthenticationFilter");
+            http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+        }
             
         return http.build();
     }
