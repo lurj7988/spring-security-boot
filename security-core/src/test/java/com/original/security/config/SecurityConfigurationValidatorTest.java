@@ -5,6 +5,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.mock.env.MockEnvironment;
 
+import java.util.Arrays;
+import java.util.Collections;
+
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -27,7 +30,9 @@ public class SecurityConfigurationValidatorTest {
         properties.getConfig().setValidation(false);
         MockEnvironment env = new MockEnvironment();
 
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, env);
+        CorsProperties corsProperties = new CorsProperties();
+        corsProperties.setEnabled(false);
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         assertDoesNotThrow(() -> validator.onApplicationEvent(event));
@@ -39,7 +44,9 @@ public class SecurityConfigurationValidatorTest {
         properties.getConfig().setValidation(true);
         MockEnvironment env = new MockEnvironment();
 
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, env);
+        CorsProperties corsProperties = new CorsProperties();
+        corsProperties.setEnabled(false);
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         ConfigurationException exception = assertThrows(ConfigurationException.class,
@@ -56,7 +63,9 @@ public class SecurityConfigurationValidatorTest {
         MockEnvironment env = new MockEnvironment();
         env.setProperty("spring.datasource.url", "   ");
 
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, env);
+        CorsProperties corsProperties = new CorsProperties();
+        corsProperties.setEnabled(false);
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         assertThrows(ConfigurationException.class, () -> validator.onApplicationEvent(event));
@@ -69,7 +78,9 @@ public class SecurityConfigurationValidatorTest {
         MockEnvironment env = new MockEnvironment();
         env.setProperty("spring.datasource.url", "jdbc:mysql://localhost:3306/db");
 
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, env);
+        CorsProperties corsProperties = new CorsProperties();
+        corsProperties.setEnabled(false);
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         assertDoesNotThrow(() -> validator.onApplicationEvent(event));
@@ -82,7 +93,9 @@ public class SecurityConfigurationValidatorTest {
         MockEnvironment env = new MockEnvironment();
         env.setProperty("spring.datasource.url", "jdbc:mysql://localhost:3306/testdb");
 
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, env);
+        CorsProperties corsProperties = new CorsProperties();
+        corsProperties.setEnabled(false);
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         // Verify no exception is thrown and validation passes
@@ -95,7 +108,9 @@ public class SecurityConfigurationValidatorTest {
         properties.getConfig().setValidation(false);
         MockEnvironment env = new MockEnvironment();
 
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, env);
+        CorsProperties corsProperties = new CorsProperties();
+        corsProperties.setEnabled(false);
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         // Verify no exception is thrown when validation is disabled
@@ -108,7 +123,9 @@ public class SecurityConfigurationValidatorTest {
         properties.getConfig().setValidation(true);
         MockEnvironment env = new MockEnvironment();
 
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, env);
+        CorsProperties corsProperties = new CorsProperties();
+        corsProperties.setEnabled(false);
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         ConfigurationException exception = assertThrows(ConfigurationException.class,
@@ -118,5 +135,55 @@ public class SecurityConfigurationValidatorTest {
         assertTrue(message.contains("=== Spring Security Boot 配置错误 ==="));
         assertTrue(message.contains("解决方案:"));
         assertTrue(message.contains("https://docs.example.com/config"));
+    }
+
+    @Test
+    public void testOnApplicationEvent_CorsEnabledMissingOrigins_ThrowsException() {
+        SecurityProperties properties = new SecurityProperties();
+        properties.getConfig().setValidation(true);
+        MockEnvironment env = new MockEnvironment();
+        env.setProperty("spring.datasource.url", "jdbc:mysql://localhost:3306/db");
+        CorsProperties corsProperties = new CorsProperties();
+        corsProperties.setEnabled(true);
+        corsProperties.setAllowedOrigins(Collections.emptyList());
+
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
+        ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
+
+        ConfigurationException exception = assertThrows(ConfigurationException.class,
+                () -> validator.onApplicationEvent(event));
+
+        assertTrue(exception.getMessage().contains("CORS 已启用，但未配置 allowed-origins"));
+    }
+
+    @Test
+    public void testOnApplicationEvent_CorsEnabledValidOrigins_DoesNotThrow() {
+        SecurityProperties properties = new SecurityProperties();
+        properties.getConfig().setValidation(true);
+        MockEnvironment env = new MockEnvironment();
+        env.setProperty("spring.datasource.url", "jdbc:mysql://localhost:3306/db");
+        CorsProperties corsProperties = new CorsProperties();
+        corsProperties.setEnabled(true);
+        corsProperties.setAllowedOrigins(Arrays.asList("http://localhost:8080"));
+
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
+        ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
+
+        assertDoesNotThrow(() -> validator.onApplicationEvent(event));
+    }
+
+    @Test
+    public void testOnApplicationEvent_CorsDisabledMissingOrigins_DoesNotThrow() {
+        SecurityProperties properties = new SecurityProperties();
+        properties.getConfig().setValidation(true);
+        MockEnvironment env = new MockEnvironment();
+        env.setProperty("spring.datasource.url", "jdbc:mysql://localhost:3306/db");
+        CorsProperties corsProperties = new CorsProperties();
+        corsProperties.setEnabled(false);
+
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
+        ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
+
+        assertDoesNotThrow(() -> validator.onApplicationEvent(event));
     }
 }

@@ -6,6 +6,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -30,6 +31,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  */
 @Configuration
 @EnableWebSecurity
+@Import(NetworkSecurityAutoConfiguration.class)
 public class SecurityAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityAutoConfiguration.class);
@@ -78,19 +80,25 @@ public class SecurityAutoConfiguration {
      * </ul>
      *
      * @param http HttpSecurity 构建器
+     * @param jwtFilterProvider JWT认证过滤器提供者
+     * @param corsProperties CORS 属性配置
      * @return 构建完毕的 SecurityFilterChain
      * @throws Exception 如果配置过程中出错
      */
     @Bean
     @ConditionalOnMissingBean(SecurityFilterChain.class)
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectProvider<JwtAuthenticationFilter> jwtFilterProvider) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectProvider<JwtAuthenticationFilter> jwtFilterProvider, CorsProperties corsProperties) throws Exception {
         log.info("Security auto-configuration: Initializing basic SecurityFilterChain");
         
+        if (corsProperties.isEnabled()) {
+            http.cors(); // 自动按照规定名称获取 corsConfigurationSource Bean
+        } else {
+            http.cors().disable();
+        }
+
         http
             // 暂时禁用默认的跨站请求伪造保护（后续 CSRF Auto Config 会接管）
             .csrf().disable()
-            // 暂时禁用跨域配置（后续 CORS Auto Config 会接管）
-            .cors().disable()
             // 禁用基础认证和表单登录
             .httpBasic().disable()
             .formLogin().disable()

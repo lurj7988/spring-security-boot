@@ -56,8 +56,8 @@ development_status:
   epic-1-retrospective: optional
 
   # Epic 2: 网络安全一体化
-  epic-2: backlog
-  2-1-cors-auto-configuration: backlog
+  epic-2: in-progress
+  2-1-cors-auto-configuration: done
   2-2-csrf-protection: backlog
   2-3-xss-protection-security-headers: backlog
   2-4-global-security-filter: backlog

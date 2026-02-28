@@ -19,7 +19,7 @@ import org.springframework.core.env.Environment;
  * @see SecurityProperties
  */
 @Configuration
-@EnableConfigurationProperties(SecurityProperties.class)
+@EnableConfigurationProperties({SecurityProperties.class, CorsProperties.class})
 public class SecurityConfigurationValidator implements ApplicationListener<ApplicationReadyEvent> {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityConfigurationValidator.class);
@@ -30,16 +30,19 @@ public class SecurityConfigurationValidator implements ApplicationListener<Appli
     private static final String DEFAULT_DOC_URL = "https://docs.example.com/config";
 
     private final SecurityProperties securityProperties;
+    private final CorsProperties corsProperties;
     private final Environment environment;
 
     /**
      * Constructs a new SecurityConfigurationValidator.
      *
      * @param securityProperties the security configuration properties
+     * @param corsProperties the CORS configuration properties
      * @param environment the Spring environment for accessing configuration
      */
-    public SecurityConfigurationValidator(SecurityProperties securityProperties, Environment environment) {
+    public SecurityConfigurationValidator(SecurityProperties securityProperties, CorsProperties corsProperties, Environment environment) {
         this.securityProperties = securityProperties;
+        this.corsProperties = corsProperties;
         this.environment = environment;
     }
 
@@ -51,6 +54,7 @@ public class SecurityConfigurationValidator implements ApplicationListener<Appli
         }
 
         validateDatasource();
+        validateCors();
 
         log.info("Spring Security Boot configuration validation passed successfully.");
         logDefaultConfigurationValues();
@@ -72,6 +76,26 @@ public class SecurityConfigurationValidator implements ApplicationListener<Appli
             );
             log.error(errorMessage);
             throw new ConfigurationException(errorMessage);
+        }
+    }
+
+    private void validateCors() {
+        if (corsProperties.isEnabled()) {
+            if (corsProperties.getAllowedOrigins() == null || corsProperties.getAllowedOrigins().isEmpty()) {
+                String errorMessage = formatErrorMessage(
+                        "CORS 已启用，但未配置 allowed-origins",
+                        "  1. 添加到 application.properties:\n" +
+                        "     security.network.cors.allowed-origins=http://localhost:8080,https://example.com\n" +
+                        "     # 如果是开发环境可以使用星号（但不推荐在生产环境）\n" +
+                        "     # security.network.cors.allowed-origins=*\n" +
+                        "\n" +
+                        "  2. 或者禁用 CORS 功能:\n" +
+                        "     security.network.cors.enabled=false\n",
+                        DEFAULT_DOC_URL
+                );
+                log.error(errorMessage);
+                throw new ConfigurationException(errorMessage);
+            }
         }
     }
 
