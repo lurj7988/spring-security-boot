@@ -19,6 +19,7 @@
         <commons-lang3.version>3.14.0</commons-lang3.version>
 
         <!-- Security & Crypto -->
+        <jjwt.version>0.11.5</jjwt.version>
         <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
         <bouncycastle.version>1.70</bouncycastle.version>
 
@@ -45,6 +46,23 @@
             </dependency>
 
             <!-- ========== Security & Crypto ========== -->
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt.version}</version>
+                <scope>runtime</scope>
+            </dependency>
             <dependency>
                 <groupId>org.bouncycastle</groupId>
                 <artifactId>bcprov-jdk15on</artifactId>
