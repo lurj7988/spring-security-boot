@@ -4,6 +4,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -15,7 +17,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  * @since 1.0.0
  */
 @Configuration
-@EnableConfigurationProperties(CorsProperties.class)
+@EnableConfigurationProperties({CorsProperties.class, CsrfProperties.class})
 public class NetworkSecurityAutoConfiguration {
 
     private final CorsProperties corsProperties;
@@ -63,5 +65,18 @@ public class NetworkSecurityAutoConfiguration {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    /**
+     * 生成 CSRF Token 存储库
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "security.network.csrf", name = "enabled", havingValue = "true", matchIfMissing = true)
+    public CsrfTokenRepository csrfTokenRepository(CsrfProperties csrfProperties) {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        if (csrfProperties.getTokenHeader() != null && !csrfProperties.getTokenHeader().isEmpty()) {
+            repository.setHeaderName(csrfProperties.getTokenHeader());
+        }
+        return repository;
     }
 }

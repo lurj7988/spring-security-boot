@@ -19,7 +19,7 @@ import org.springframework.core.env.Environment;
  * @see SecurityProperties
  */
 @Configuration
-@EnableConfigurationProperties({SecurityProperties.class, CorsProperties.class})
+@EnableConfigurationProperties({SecurityProperties.class, CorsProperties.class, CsrfProperties.class})
 public class SecurityConfigurationValidator implements ApplicationListener<ApplicationReadyEvent> {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityConfigurationValidator.class);
@@ -31,6 +31,7 @@ public class SecurityConfigurationValidator implements ApplicationListener<Appli
 
     private final SecurityProperties securityProperties;
     private final CorsProperties corsProperties;
+    private final CsrfProperties csrfProperties;
     private final Environment environment;
 
     /**
@@ -40,9 +41,10 @@ public class SecurityConfigurationValidator implements ApplicationListener<Appli
      * @param corsProperties the CORS configuration properties
      * @param environment the Spring environment for accessing configuration
      */
-    public SecurityConfigurationValidator(SecurityProperties securityProperties, CorsProperties corsProperties, Environment environment) {
+    public SecurityConfigurationValidator(SecurityProperties securityProperties, CorsProperties corsProperties, CsrfProperties csrfProperties, Environment environment) {
         this.securityProperties = securityProperties;
         this.corsProperties = corsProperties;
+        this.csrfProperties = csrfProperties;
         this.environment = environment;
     }
 
@@ -55,6 +57,7 @@ public class SecurityConfigurationValidator implements ApplicationListener<Appli
 
         validateDatasource();
         validateCors();
+        validateCsrf();
 
         log.info("Spring Security Boot configuration validation passed successfully.");
         logDefaultConfigurationValues();
@@ -96,6 +99,12 @@ public class SecurityConfigurationValidator implements ApplicationListener<Appli
                 log.error(errorMessage);
                 throw new ConfigurationException(errorMessage);
             }
+        }
+    }
+
+    private void validateCsrf() {
+        if (!csrfProperties.isEnabled()) {
+            log.warn("=== Spring Security Boot 安全警告 === CSRF 防护已被禁用，请确认是否符合安全策略");
         }
     }
 

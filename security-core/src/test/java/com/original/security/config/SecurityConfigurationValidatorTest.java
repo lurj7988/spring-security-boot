@@ -32,7 +32,8 @@ public class SecurityConfigurationValidatorTest {
 
         CorsProperties corsProperties = new CorsProperties();
         corsProperties.setEnabled(false);
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
+        CsrfProperties csrfProperties = new CsrfProperties();
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, csrfProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         assertDoesNotThrow(() -> validator.onApplicationEvent(event));
@@ -46,7 +47,8 @@ public class SecurityConfigurationValidatorTest {
 
         CorsProperties corsProperties = new CorsProperties();
         corsProperties.setEnabled(false);
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
+        CsrfProperties csrfProperties = new CsrfProperties();
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, csrfProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         ConfigurationException exception = assertThrows(ConfigurationException.class,
@@ -65,7 +67,8 @@ public class SecurityConfigurationValidatorTest {
 
         CorsProperties corsProperties = new CorsProperties();
         corsProperties.setEnabled(false);
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
+        CsrfProperties csrfProperties = new CsrfProperties();
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, csrfProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         assertThrows(ConfigurationException.class, () -> validator.onApplicationEvent(event));
@@ -80,7 +83,8 @@ public class SecurityConfigurationValidatorTest {
 
         CorsProperties corsProperties = new CorsProperties();
         corsProperties.setEnabled(false);
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
+        CsrfProperties csrfProperties = new CsrfProperties();
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, csrfProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         assertDoesNotThrow(() -> validator.onApplicationEvent(event));
@@ -95,7 +99,8 @@ public class SecurityConfigurationValidatorTest {
 
         CorsProperties corsProperties = new CorsProperties();
         corsProperties.setEnabled(false);
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
+        CsrfProperties csrfProperties = new CsrfProperties();
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, csrfProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         // Verify no exception is thrown and validation passes
@@ -110,7 +115,8 @@ public class SecurityConfigurationValidatorTest {
 
         CorsProperties corsProperties = new CorsProperties();
         corsProperties.setEnabled(false);
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
+        CsrfProperties csrfProperties = new CsrfProperties();
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, csrfProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         // Verify no exception is thrown when validation is disabled
@@ -125,7 +131,8 @@ public class SecurityConfigurationValidatorTest {
 
         CorsProperties corsProperties = new CorsProperties();
         corsProperties.setEnabled(false);
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
+        CsrfProperties csrfProperties = new CsrfProperties();
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, csrfProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         ConfigurationException exception = assertThrows(ConfigurationException.class,
@@ -147,7 +154,8 @@ public class SecurityConfigurationValidatorTest {
         corsProperties.setEnabled(true);
         corsProperties.setAllowedOrigins(Collections.emptyList());
 
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
+        CsrfProperties csrfProperties = new CsrfProperties();
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, csrfProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         ConfigurationException exception = assertThrows(ConfigurationException.class,
@@ -166,7 +174,8 @@ public class SecurityConfigurationValidatorTest {
         corsProperties.setEnabled(true);
         corsProperties.setAllowedOrigins(Arrays.asList("http://localhost:8080"));
 
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
+        CsrfProperties csrfProperties = new CsrfProperties();
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, csrfProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         assertDoesNotThrow(() -> validator.onApplicationEvent(event));
@@ -181,7 +190,27 @@ public class SecurityConfigurationValidatorTest {
         CorsProperties corsProperties = new CorsProperties();
         corsProperties.setEnabled(false);
 
-        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, env);
+        CsrfProperties csrfProperties = new CsrfProperties();
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, csrfProperties, env);
+        ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
+
+        assertDoesNotThrow(() -> validator.onApplicationEvent(event));
+    }
+
+    @Test
+    public void testOnApplicationEvent_CsrfDisabled_DoesNotThrow() {
+        SecurityProperties properties = new SecurityProperties();
+        properties.getConfig().setValidation(true);
+        MockEnvironment env = new MockEnvironment();
+        env.setProperty("spring.datasource.url", "jdbc:mysql://localhost:3306/db");
+        CorsProperties corsProperties = new CorsProperties();
+        corsProperties.setEnabled(true);
+        corsProperties.setAllowedOrigins(Arrays.asList("http://localhost:8080"));
+
+        CsrfProperties csrfProperties = new CsrfProperties();
+        csrfProperties.setEnabled(false);
+
+        SecurityConfigurationValidator validator = new SecurityConfigurationValidator(properties, corsProperties, csrfProperties, env);
         ApplicationReadyEvent event = mock(ApplicationReadyEvent.class);
 
         assertDoesNotThrow(() -> validator.onApplicationEvent(event));

@@ -17,6 +17,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import com.original.security.filter.JwtAuthenticationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
+import com.original.security.handler.FrameAccessDeniedHandler;
 
 /**
  * Spring Security Boot 核心自动配置类。
@@ -87,7 +89,13 @@ public class SecurityAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(SecurityFilterChain.class)
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectProvider<JwtAuthenticationFilter> jwtFilterProvider, CorsProperties corsProperties) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http, 
+            ObjectProvider<JwtAuthenticationFilter> jwtFilterProvider, 
+            CorsProperties corsProperties,
+            ObjectProvider<CsrfTokenRepository> csrfTokenRepositoryProvider,
+            ObjectProvider<FrameAccessDeniedHandler> accessDeniedHandlerProvider
+    ) throws Exception {
         log.info("Security auto-configuration: Initializing basic SecurityFilterChain");
         
         if (corsProperties.isEnabled()) {
@@ -96,14 +104,26 @@ public class SecurityAutoConfiguration {
             http.cors().disable();
         }
 
+        CsrfTokenRepository csrfTokenRepository = csrfTokenRepositoryProvider.getIfAvailable();
+        if (csrfTokenRepository != null) {
+            http.csrf().csrfTokenRepository(csrfTokenRepository);
+        } else {
+            http.csrf().disable();
+        }
+
+        FrameAccessDeniedHandler accessDeniedHandler = accessDeniedHandlerProvider.getIfAvailable();
+        if (accessDeniedHandler != null) {
+            http.exceptionHandling().accessDeniedHandler(accessDeniedHandler);
+        }
+
         http
-            // 暂时禁用默认的跨站请求伪造保护（后续 CSRF Auto Config 会接管）
-            .csrf().disable()
             // 禁用基础认证和表单登录
             .httpBasic().disable()
             .formLogin().disable()
+
+            // 基础退出禁用，之后会使用我们的 Logout机制或者直接不管理
             .logout().disable()
-            // 设置默认的会话策略为无状态，因为框架将主要基于 Token (如 JWT)
+            // 设置默认的会话策略为无状态
             .sessionManagement()
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             .and()
