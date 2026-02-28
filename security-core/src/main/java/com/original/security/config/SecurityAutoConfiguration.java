@@ -101,6 +101,7 @@ public class SecurityAutoConfiguration {
             .and()
             // 所有请求都需要认证（默认极简策略），由应用自定义更详细的权限放行
             .authorizeHttpRequests()
+                .antMatchers("/api/auth/login", "/api/auth/refresh").permitAll()
                 .anyRequest().authenticated();
             
         JwtAuthenticationFilter jwtFilter = jwtFilterProvider.getIfAvailable();
