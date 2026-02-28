@@ -146,6 +146,28 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - 不使用魔法值，定义为常量
 - 公共 API 必须有 JavaDoc
 
+**Import 语句规范：**
+
+- **禁止在类声明处使用全包名实现接口**，应使用 import 导入
+- 当需要使用两个同名类/接口时：
+  1. 在 import 中导入主要/常用的那个
+  2. 仅对次要的同名类在必要时使用全包名（如类声明的 implements 子句）
+  3. 在 JavaDoc 中说明为何需要同时使用两个同名接口
+- **示例（正确）：**
+  ```java
+  import org.springframework.security.authentication.AuthenticationProvider;
+
+  public class DaoAuthenticationProvider
+          implements AuthenticationProvider,
+                     com.original.security.core.authentication.AuthenticationProvider {
+  ```
+- **示例（错误）：**
+  ```java
+  public class DaoAuthenticationProvider implements
+          org.springframework.security.authentication.AuthenticationProvider,
+          com.original.security.core.authentication.AuthenticationProvider {
+  ```
+
 **代码审查检查清单：**
 
 - [ ] 使用构造器注入
@@ -223,4 +245,4 @@ mvn test                                        # 运行测试
 
 ---
 
-**最后更新：** 2026-02-24
+**最后更新：** 2026-02-28
