@@ -17,11 +17,16 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  * @since 1.0.0
  */
 @Configuration
-@EnableConfigurationProperties({CorsProperties.class, CsrfProperties.class})
+@EnableConfigurationProperties({CorsProperties.class, CsrfProperties.class, SecurityHeadersProperties.class, CspProperties.class})
 public class NetworkSecurityAutoConfiguration {
 
     private final CorsProperties corsProperties;
 
+    /**
+     * Constructs a new NetworkSecurityAutoConfiguration.
+     *
+     * @param corsProperties the CORS configuration properties
+     */
     public NetworkSecurityAutoConfiguration(CorsProperties corsProperties) {
         this.corsProperties = corsProperties;
     }

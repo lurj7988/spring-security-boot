@@ -59,7 +59,7 @@ development_status:
   epic-2: in-progress
   2-1-cors-auto-configuration: done
   2-2-csrf-protection: done
-  2-3-xss-protection-security-headers: backlog
+  2-3-xss-protection-security-headers: done
   2-4-global-security-filter: backlog
   epic-2-retrospective: optional
 

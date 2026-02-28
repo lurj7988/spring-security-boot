@@ -82,8 +82,12 @@ public class SecurityAutoConfiguration {
      * </ul>
      *
      * @param http HttpSecurity 构建器
-     * @param jwtFilterProvider JWT认证过滤器提供者
+     * @param jwtFilterProvider JWT认证过滤器提供者，可能为 null
      * @param corsProperties CORS 属性配置
+     * @param csrfTokenRepositoryProvider CSRF Token 存储库提供者，可能为 null
+     * @param accessDeniedHandlerProvider 访问拒绝处理器提供者，可能为 null
+     * @param headersPropertiesProvider 安全响应头属性提供者，用于配置 X-Frame-Options、X-Content-Type-Options、X-XSS-Protection、HSTS
+     * @param cspPropertiesProvider CSP 属性提供者，用于配置 Content-Security-Policy 头
      * @return 构建完毕的 SecurityFilterChain
      * @throws Exception 如果配置过程中出错
      */
@@ -94,7 +98,9 @@ public class SecurityAutoConfiguration {
             ObjectProvider<JwtAuthenticationFilter> jwtFilterProvider, 
             CorsProperties corsProperties,
             ObjectProvider<CsrfTokenRepository> csrfTokenRepositoryProvider,
-            ObjectProvider<FrameAccessDeniedHandler> accessDeniedHandlerProvider
+            ObjectProvider<FrameAccessDeniedHandler> accessDeniedHandlerProvider,
+            ObjectProvider<SecurityHeadersProperties> headersPropertiesProvider,
+            ObjectProvider<CspProperties> cspPropertiesProvider
     ) throws Exception {
         log.info("Security auto-configuration: Initializing basic SecurityFilterChain");
         
@@ -114,6 +120,45 @@ public class SecurityAutoConfiguration {
         FrameAccessDeniedHandler accessDeniedHandler = accessDeniedHandlerProvider.getIfAvailable();
         if (accessDeniedHandler != null) {
             http.exceptionHandling().accessDeniedHandler(accessDeniedHandler);
+        }
+
+        SecurityHeadersProperties headersProperties = headersPropertiesProvider.getIfAvailable();
+        if (headersProperties != null && headersProperties.isEnabled()) {
+            http.headers(headers -> {
+                if ("DENY".equalsIgnoreCase(headersProperties.getFrameOptions())) {
+                    headers.frameOptions().deny();
+                } else if ("SAMEORIGIN".equalsIgnoreCase(headersProperties.getFrameOptions())) {
+                    headers.frameOptions().sameOrigin();
+                } else {
+                    headers.frameOptions().disable();
+                }
+                
+                if (headersProperties.isContentTypeOptions()) {
+                    headers.contentTypeOptions();
+                }
+                
+                if (headersProperties.isXssProtection()) {
+                    headers.xssProtection().block(true);
+                } else {
+                    headers.xssProtection().disable();
+                }
+                
+                if (headersProperties.getHstsMaxAge() > 0) {
+                    headers.httpStrictTransportSecurity()
+                            .maxAgeInSeconds(headersProperties.getHstsMaxAge())
+                            .includeSubDomains(headersProperties.isHstsIncludeSubDomains())
+                            .preload(headersProperties.isHstsPreload());
+                } else {
+                    headers.httpStrictTransportSecurity().disable();
+                }
+
+                CspProperties cspProperties = cspPropertiesProvider.getIfAvailable();
+                if (cspProperties != null && cspProperties.isEnabled()) {
+                    headers.contentSecurityPolicy(cspProperties.getPolicy());
+                }
+            });
+        } else {
+            http.headers().disable();
         }
 
         http

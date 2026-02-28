@@ -19,19 +19,22 @@ import org.springframework.core.env.Environment;
  * @see SecurityProperties
  */
 @Configuration
-@EnableConfigurationProperties({SecurityProperties.class, CorsProperties.class, CsrfProperties.class})
+@EnableConfigurationProperties({SecurityProperties.class, CorsProperties.class, CsrfProperties.class, SecurityHeadersProperties.class, CspProperties.class})
 public class SecurityConfigurationValidator implements ApplicationListener<ApplicationReadyEvent> {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityConfigurationValidator.class);
 
     /**
      * Default documentation URL for configuration help.
+     * 请根据实际项目文档 URL 更新此常量。
      */
-    private static final String DEFAULT_DOC_URL = "https://docs.example.com/config";
+    private static final String DEFAULT_DOC_URL = "https://docs.spring-security-boot.io/config";
 
     private final SecurityProperties securityProperties;
     private final CorsProperties corsProperties;
     private final CsrfProperties csrfProperties;
+    private final SecurityHeadersProperties securityHeadersProperties;
+    private final CspProperties cspProperties;
     private final Environment environment;
 
     /**
@@ -39,12 +42,17 @@ public class SecurityConfigurationValidator implements ApplicationListener<Appli
      *
      * @param securityProperties the security configuration properties
      * @param corsProperties the CORS configuration properties
+     * @param csrfProperties the CSRF configuration properties
+     * @param securityHeadersProperties the Security Headers configuration properties
+     * @param cspProperties the CSP configuration properties
      * @param environment the Spring environment for accessing configuration
      */
-    public SecurityConfigurationValidator(SecurityProperties securityProperties, CorsProperties corsProperties, CsrfProperties csrfProperties, Environment environment) {
+    public SecurityConfigurationValidator(SecurityProperties securityProperties, CorsProperties corsProperties, CsrfProperties csrfProperties, SecurityHeadersProperties securityHeadersProperties, CspProperties cspProperties, Environment environment) {
         this.securityProperties = securityProperties;
         this.corsProperties = corsProperties;
         this.csrfProperties = csrfProperties;
+        this.securityHeadersProperties = securityHeadersProperties;
+        this.cspProperties = cspProperties;
         this.environment = environment;
     }
 
@@ -58,6 +66,7 @@ public class SecurityConfigurationValidator implements ApplicationListener<Appli
         validateDatasource();
         validateCors();
         validateCsrf();
+        validateSecurityHeaders();
 
         log.info("Spring Security Boot configuration validation passed successfully.");
         logDefaultConfigurationValues();
@@ -105,6 +114,28 @@ public class SecurityConfigurationValidator implements ApplicationListener<Appli
     private void validateCsrf() {
         if (!csrfProperties.isEnabled()) {
             log.warn("=== Spring Security Boot 安全警告 === CSRF 防护已被禁用，请确认是否符合安全策略");
+        }
+    }
+
+    private void validateSecurityHeaders() {
+        if (!securityHeadersProperties.isEnabled()) {
+            log.warn("=== Spring Security Boot 安全警告 === Security Headers 已被禁用，此举存在较高安全风险！");
+        } else if (!securityHeadersProperties.isXssProtection()) {
+            log.warn("=== Spring Security Boot 安全警告 === XSS 防护已被禁用，存在跨站脚本注入风险");
+        }
+
+        // 检测 HSTS 是否在非 HTTPS 环境下启用
+        if (securityHeadersProperties.isEnabled() && securityHeadersProperties.getHstsMaxAge() > 0) {
+            String protocol = environment.getProperty("server.ssl.enabled", "false");
+            String scheme = environment.getProperty("server.servlet.session.cookie.scheme", "");
+            if (!"true".equalsIgnoreCase(protocol) && !"https".equalsIgnoreCase(scheme)) {
+                log.warn("=== Spring Security Boot 安全警告 === HSTS (Strict-Transport-Security) 已启用，但应用似乎未配置 HTTPS。"
+                    + "HSTS 仅应在 HTTPS 环境下使用。请确保已配置 SSL/TLS 或设置 hsts-max-age=0");
+            }
+        }
+
+        if (cspProperties.isEnabled()) {
+            log.info("Spring Security Boot: Content Security Policy (CSP) 已启用，策略: {}", cspProperties.getPolicy());
         }
     }
 
