@@ -9,10 +9,14 @@ import java.util.Map;
 public class Response<T> implements Message<T> {
 
     protected int code;
+    @com.fasterxml.jackson.annotation.JsonProperty("path")
     protected String uri = "";
+    @com.fasterxml.jackson.annotation.JsonProperty("message")
     protected String msg = "";
+    @com.fasterxml.jackson.annotation.JsonProperty("data")
     protected T body;
     protected final long timestamp = System.currentTimeMillis();
+    @com.fasterxml.jackson.annotation.JsonIgnore
     protected Map<String, String> headers = new HashMap<>();
 
     private static final ObjectMapper mapper = new ObjectMapper();
@@ -37,6 +41,7 @@ public class Response<T> implements Message<T> {
         return new ResponseBuilder<>(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, null);
     }
 
+    @com.fasterxml.jackson.annotation.JsonProperty("path")
     @Override
     public String getLocationUri() {
         return uri;
@@ -47,6 +52,7 @@ public class Response<T> implements Message<T> {
         this.uri = uri;
     }
 
+    @com.fasterxml.jackson.annotation.JsonProperty("data")
     @Override
     public T getBody() {
         return body;
@@ -85,6 +91,7 @@ public class Response<T> implements Message<T> {
         this.code = code;
     }
 
+    @com.fasterxml.jackson.annotation.JsonProperty("message")
     public String getMsg() {
         return msg;
     }

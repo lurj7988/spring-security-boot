@@ -85,9 +85,9 @@ public class AuthenticationControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.body.token").value("mock-token"))
-                .andExpect(jsonPath("$.body.user").value("admin"))
-                .andExpect(jsonPath("$.body.jwtEnabled").value(true));
+                .andExpect(jsonPath("$.data.token").value("mock-token"))
+                .andExpect(jsonPath("$.data.user").value("admin"))
+                .andExpect(jsonPath("$.data.jwtEnabled").value(true));
     }
 
     /**
@@ -109,7 +109,7 @@ public class AuthenticationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(500))
                 // 验证不泄露具体的异常信息（如 "Bad credentials"）
-                .andExpect(jsonPath("$.msg").value("用户名或密码错误"));
+                .andExpect(jsonPath("$.message").value("用户名或密码错误"));
     }
 
     /**
@@ -146,7 +146,7 @@ public class AuthenticationControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.body.token").value("new-token"));
+                .andExpect(jsonPath("$.data.token").value("new-token"));
     }
 
     /**
@@ -165,7 +165,7 @@ public class AuthenticationControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(500))
-                .andExpect(jsonPath("$.msg").value("Token 已过期，请重新登录"));
+                .andExpect(jsonPath("$.message").value("Token 已过期，请重新登录"));
     }
 
     /**
@@ -182,7 +182,7 @@ public class AuthenticationControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(500))
-                .andExpect(jsonPath("$.msg").value("刷新 Token 不能为空"));
+                .andExpect(jsonPath("$.message").value("刷新 Token 不能为空"));
     }
 
     /**
@@ -206,8 +206,8 @@ public class AuthenticationControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.body.user").value("admin"))
-                .andExpect(jsonPath("$.body.token").isEmpty())
-                .andExpect(jsonPath("$.body.jwtEnabled").value(false));
+                .andExpect(jsonPath("$.data.user").value("admin"))
+                .andExpect(jsonPath("$.data.token").isEmpty())
+                .andExpect(jsonPath("$.data.jwtEnabled").value(false));
     }
 }

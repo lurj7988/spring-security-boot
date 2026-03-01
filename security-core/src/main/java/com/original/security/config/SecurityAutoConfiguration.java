@@ -19,6 +19,7 @@ import com.original.security.filter.JwtAuthenticationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import com.original.security.handler.FrameAccessDeniedHandler;
+import com.original.security.handler.FrameAuthenticationEntryPoint;
 import com.original.security.plugin.SecurityFilterPlugin;
 
 import javax.servlet.Filter;
@@ -39,7 +40,7 @@ import java.util.stream.Collectors;
  */
 @Configuration
 @EnableWebSecurity
-@Import(NetworkSecurityAutoConfiguration.class)
+@Import({NetworkSecurityAutoConfiguration.class, MethodSecurityConfiguration.class})
 public class SecurityAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityAutoConfiguration.class);
@@ -80,6 +81,16 @@ public class SecurityAutoConfiguration {
     }
 
     /**
+     * 注册授权审计监听器。
+     */
+    @Bean
+    @ConditionalOnMissingBean(com.original.security.event.AuthorizationAuditListener.class)
+    public com.original.security.event.AuthorizationAuditListener authorizationAuditListener() {
+        log.info("Security auto-configuration: Registering AuthorizationAuditListener");
+        return new com.original.security.event.AuthorizationAuditListener();
+    }
+
+    /**
      * 构建并在容器中装配默认的 SecurityFilterChain。
      * <ul>
      *     <li>禁用默认的表单登录和 Basic 认证（后续由插件式架构接管）</li>
@@ -107,6 +118,7 @@ public class SecurityAutoConfiguration {
             ObjectProvider<FrameAccessDeniedHandler> accessDeniedHandlerProvider,
             ObjectProvider<SecurityHeadersProperties> headersPropertiesProvider,
             ObjectProvider<CspProperties> cspPropertiesProvider,
+            ObjectProvider<FrameAuthenticationEntryPoint> authenticationEntryPointProvider,
             ObjectProvider<SecurityFilterPlugin> filterPluginsProvider
     ) throws Exception {
         log.info("Security auto-configuration: Initializing basic SecurityFilterChain");
@@ -125,8 +137,17 @@ public class SecurityAutoConfiguration {
         }
 
         FrameAccessDeniedHandler accessDeniedHandler = accessDeniedHandlerProvider.getIfAvailable();
-        if (accessDeniedHandler != null) {
-            http.exceptionHandling().accessDeniedHandler(accessDeniedHandler);
+        FrameAuthenticationEntryPoint authenticationEntryPoint = authenticationEntryPointProvider.getIfAvailable();
+        
+        if (accessDeniedHandler != null || authenticationEntryPoint != null) {
+            http.exceptionHandling(exceptionHandling -> {
+                if (accessDeniedHandler != null) {
+                    exceptionHandling.accessDeniedHandler(accessDeniedHandler);
+                }
+                if (authenticationEntryPoint != null) {
+                    exceptionHandling.authenticationEntryPoint(authenticationEntryPoint);
+                }
+            });
         }
 
         SecurityHeadersProperties headersProperties = headersPropertiesProvider.getIfAvailable();

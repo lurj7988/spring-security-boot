@@ -56,9 +56,9 @@ public class FrameAuthenticationSuccessHandlerTest {
 
         JsonNode jsonNode = objectMapper.readTree(response.getContentAsByteArray());
         assertEquals(200, jsonNode.get("code").asInt());
-        assertTrue(jsonNode.has("body"));
-        assertTrue(jsonNode.get("body").has("user"));
-        assertEquals("admin", jsonNode.get("body").get("user").asText());
-        assertEquals("mocked.jwt.token", jsonNode.get("body").get("token").asText());
+        assertTrue(jsonNode.has("data"));
+        assertTrue(jsonNode.get("data").has("user"));
+        assertEquals("admin", jsonNode.get("data").get("user").asText());
+        assertEquals("mocked.jwt.token", jsonNode.get("data").get("token").asText());
     }
 }

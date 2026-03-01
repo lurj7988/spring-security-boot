@@ -45,7 +45,7 @@ public class FrameAuthenticationFailureHandlerTest {
 
         JsonNode jsonNode = objectMapper.readTree(response.getContentAsByteArray());
         assertEquals(401, jsonNode.get("code").asInt());
-        assertTrue(jsonNode.get("msg").asText().contains("用户名或密码错误"));
+        assertTrue(jsonNode.get("message").asText().contains("用户名或密码错误"));
     }
 
     @Test
@@ -61,6 +61,6 @@ public class FrameAuthenticationFailureHandlerTest {
 
         JsonNode jsonNode = objectMapper.readTree(response.getContentAsByteArray());
         assertEquals(401, jsonNode.get("code").asInt());
-        assertTrue(jsonNode.get("msg").asText().contains("账号已被禁用"));
+        assertTrue(jsonNode.get("message").asText().contains("账号已被禁用"));
     }
 }
