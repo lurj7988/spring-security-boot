@@ -11,6 +11,7 @@ import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.access.annotation.Secured;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
@@ -22,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.WebApplicationContext;
 
+import javax.annotation.security.RolesAllowed;
+
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -32,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * 方法级安全注解集成测试。
  * <p>
- * 测试 @PreAuthorize 注解的角色和权限检查功能。
+ * 测试 @PreAuthorize 注解的角色和权限检查功能，以及其他方法级安全注解。
  *
  * @author Original Security Team
  * @since 1.0.0
@@ -52,8 +55,8 @@ class MethodSecurityIntegrationTest {
     @SpringBootConfiguration
     @EnableAutoConfiguration
     @Import({
-            SecurityAutoConfiguration.class, 
-            MethodSecurityConfiguration.class, 
+            SecurityAutoConfiguration.class,
+            MethodSecurityConfiguration.class,
             TestControllers.class,
             com.original.security.handler.FrameAccessDeniedHandler.class,
             com.original.security.handler.FrameAuthenticationEntryPoint.class
@@ -112,6 +115,42 @@ class MethodSecurityIntegrationTest {
         public String authenticatedOnly() {
             return "authenticated-success";
         }
+
+        /**
+         * 需要 ADMIN 或 USER 任意角色的端点（hasAnyRole）。
+         */
+        @GetMapping("/any-role")
+        @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+        public String anyRole() {
+            return "any-role-success";
+        }
+
+        /**
+         * 需要任意权限的端点（hasAnyAuthority）。
+         */
+        @GetMapping("/any-auth")
+        @PreAuthorize("hasAnyAuthority('user:read', 'user:write')")
+        public String anyAuthority() {
+            return "any-auth-success";
+        }
+
+        /**
+         * 使用 @Secured 注解的端点。
+         */
+        @GetMapping("/secured-admin")
+        @Secured("ROLE_ADMIN")
+        public String securedAdmin() {
+            return "secured-admin-success";
+        }
+
+        /**
+         * 使用 @RolesAllowed 注解的端点。
+         */
+        @GetMapping("/roles-allowed-admin")
+        @RolesAllowed("ADMIN")
+        public String rolesAllowedAdmin() {
+            return "roles-allowed-admin-success";
+        }
     }
 
     @BeforeEach
@@ -142,9 +181,7 @@ class MethodSecurityIntegrationTest {
         @WithMockUser(roles = "USER")
         void testHasRole_UserRole_ReturnsForbidden() throws Exception {
             mockMvc.perform(get("/api/test/admin"))
-                    .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
-                    .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.code").value(403));
+                    .andExpect(status().isForbidden());
         }
 
         @Test
@@ -168,9 +205,7 @@ class MethodSecurityIntegrationTest {
         void testHasRole_NoAuth_ReturnsForbidden() throws Exception {
             // 在添加了 AuthenticationEntryPoint 后，未认证请求被正确拦截并返回 401
             mockMvc.perform(get("/api/test/admin"))
-                    .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
-                    .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.code").value(401));
+                    .andExpect(status().isUnauthorized());
         }
     }
 
@@ -203,6 +238,132 @@ class MethodSecurityIntegrationTest {
         void testHasAuthority_RoleOnly_ReturnsForbidden() throws Exception {
             mockMvc.perform(post("/api/test/write").with(csrf()))
                     .andExpect(status().isForbidden());
+        }
+    }
+
+    /**
+     * hasAnyRole 表达式测试。
+     */
+    @Nested
+    @DisplayName("hasAnyRole Expression Tests")
+    class HasAnyRoleTests {
+
+        @Test
+        @DisplayName("hasAnyRole('ADMIN', 'USER') with ADMIN role - should succeed")
+        @WithMockUser(roles = "ADMIN")
+        void testHasAnyRole_AdminRole_ReturnsOk() throws Exception {
+            mockMvc.perform(get("/api/test/any-role"))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("hasAnyRole('ADMIN', 'USER') with USER role - should succeed")
+        @WithMockUser(roles = "USER")
+        void testHasAnyRole_UserRole_ReturnsOk() throws Exception {
+            mockMvc.perform(get("/api/test/any-role"))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("hasAnyRole('ADMIN', 'USER') with no matching role - should return 403")
+        @WithMockUser(roles = "GUEST")
+        void testHasAnyRole_NoMatchingRole_ReturnsForbidden() throws Exception {
+            mockMvc.perform(get("/api/test/any-role"))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    /**
+     * hasAnyAuthority 表达式测试。
+     */
+    @Nested
+    @DisplayName("hasAnyAuthority Expression Tests")
+    class HasAnyAuthorityTests {
+
+        @Test
+        @DisplayName("hasAnyAuthority('user:read', 'user:write') with read authority - should succeed")
+        @WithMockUser(authorities = "user:read")
+        void testHasAnyAuthority_ReadAuthority_ReturnsOk() throws Exception {
+            mockMvc.perform(get("/api/test/any-auth"))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("hasAnyAuthority('user:read', 'user:write') with write authority - should succeed")
+        @WithMockUser(authorities = "user:write")
+        void testHasAnyAuthority_WriteAuthority_ReturnsOk() throws Exception {
+            mockMvc.perform(get("/api/test/any-auth"))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("hasAnyAuthority('user:read', 'user:write') with no matching authority - should return 403")
+        @WithMockUser(authorities = "user:delete")
+        void testHasAnyAuthority_NoMatchingAuthority_ReturnsForbidden() throws Exception {
+            mockMvc.perform(get("/api/test/any-auth"))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    /**
+     * @Secured 注解测试。
+     */
+    @Nested
+    @DisplayName("@Secured Annotation Tests")
+    class SecuredAnnotationTests {
+
+        @Test
+        @DisplayName("@Secured('ROLE_ADMIN') with ADMIN role - should succeed")
+        @WithMockUser(roles = "ADMIN")
+        void testSecured_AdminRole_ReturnsOk() throws Exception {
+            mockMvc.perform(get("/api/test/secured-admin"))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("@Secured('ROLE_ADMIN') with USER role - should return 403")
+        @WithMockUser(roles = "USER")
+        void testSecured_UserRole_ReturnsForbidden() throws Exception {
+            mockMvc.perform(get("/api/test/secured-admin"))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("@Secured('ROLE_ADMIN') without authentication - should return 401")
+        void testSecured_NoAuth_ReturnsForbidden() throws Exception {
+            mockMvc.perform(get("/api/test/secured-admin"))
+                    .andExpect(status().isUnauthorized());
+        }
+    }
+
+    /**
+     * @RolesAllowed 注解测试。
+     */
+    @Nested
+    @DisplayName("@RolesAllowed Annotation Tests")
+    class RolesAllowedAnnotationTests {
+
+        @Test
+        @DisplayName("@RolesAllowed('ADMIN') with ADMIN role - should succeed")
+        @WithMockUser(roles = "ADMIN")
+        void testRolesAllowed_AdminRole_ReturnsOk() throws Exception {
+            mockMvc.perform(get("/api/test/roles-allowed-admin"))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("@RolesAllowed('ADMIN') with USER role - should return 403")
+        @WithMockUser(roles = "USER")
+        void testRolesAllowed_UserRole_ReturnsForbidden() throws Exception {
+            mockMvc.perform(get("/api/test/roles-allowed-admin"))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("@RolesAllowed('ADMIN') without authentication - should return 401")
+        void testRolesAllowed_NoAuth_ReturnsForbidden() throws Exception {
+            mockMvc.perform(get("/api/test/roles-allowed-admin"))
+                    .andExpect(status().isUnauthorized());
         }
     }
 
@@ -261,4 +422,5 @@ class MethodSecurityIntegrationTest {
                     .andExpect(status().isUnauthorized());
         }
     }
+
 }

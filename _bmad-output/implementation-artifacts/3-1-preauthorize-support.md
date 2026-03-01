@@ -1,6 +1,6 @@
 # Story 3.1: 实现 @PreAuthorize 权限注解支持
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -226,7 +226,10 @@ Claude (GLM-5)
 
 ### Debug Log References
 
-- 测试运行：13 个测试全部通过
+- 测试运行：13 个测试全部通过（初始实现）
+- 编译：成功
+- **代码审查后修复**：新增 12 个测试用例，覆盖 hasAnyRole、hasAnyAuthority、@Secured、@RolesAllowed 注解
+- 测试运行：25 个测试全部通过（修复后）
 - 编译：成功
 
 ### Completion Notes List
@@ -242,6 +245,13 @@ Claude (GLM-5)
 4. **测试发现**: 方法级安全注解在未认证用户访问时返回 403 Forbidden 而不是 401 Unauthorized，这是因为 `@PreAuthorize` 在方法调用前检查，此时用户已被 Spring Security 视为"已验证"的匿名用户。
 
 5. **@WithMockUser 限制**: 不能同时使用 `roles` 和 `authorities` 参数，因为它们会互相覆盖。需要同时指定角色和权限时，应只使用 `authorities` 参数并包含 `ROLE_` 前缀的角色。
+
+6. **代码审查修复（M1）**: 补充了测试覆盖率，新增 12 个测试用例：
+   - `hasAnyRole` 表达式测试（3 个用例）
+   - `hasAnyAuthority` 表达式测试（3 个用例）
+   - `@Secured` 注解测试（3 个用例）
+   - `@RolesAllowed` 注解测试（3 个用例）
+   测试总数从 13 个增加到 25 个，全部通过。
 
 ### File List
 
