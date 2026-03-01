@@ -19,6 +19,12 @@ import com.original.security.filter.JwtAuthenticationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import com.original.security.handler.FrameAccessDeniedHandler;
+import com.original.security.plugin.SecurityFilterPlugin;
+
+import javax.servlet.Filter;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Spring Security Boot 核心自动配置类。
@@ -100,7 +106,8 @@ public class SecurityAutoConfiguration {
             ObjectProvider<CsrfTokenRepository> csrfTokenRepositoryProvider,
             ObjectProvider<FrameAccessDeniedHandler> accessDeniedHandlerProvider,
             ObjectProvider<SecurityHeadersProperties> headersPropertiesProvider,
-            ObjectProvider<CspProperties> cspPropertiesProvider
+            ObjectProvider<CspProperties> cspPropertiesProvider,
+            ObjectProvider<SecurityFilterPlugin> filterPluginsProvider
     ) throws Exception {
         log.info("Security auto-configuration: Initializing basic SecurityFilterChain");
         
@@ -177,12 +184,58 @@ public class SecurityAutoConfiguration {
                 .antMatchers("/api/auth/login", "/api/auth/refresh").permitAll()
                 .anyRequest().authenticated();
             
+        List<SecurityFilterPlugin> filterPlugins = filterPluginsProvider.orderedStream()
+                .filter(SecurityFilterPlugin::isEnabled)
+                .collect(Collectors.toList());
+
+        if (!filterPlugins.isEmpty()) {
+            log.info("Security auto-configuration: Registering {} custom filter plugin(s)", filterPlugins.size());
+
+            for (SecurityFilterPlugin plugin : filterPlugins) {
+                log.debug("Security auto-configuration: Registering filter plugin [{}] at position {} relative to {}",
+                        plugin.getName(), plugin.getPosition(), plugin.getTargetFilterClass().getSimpleName());
+
+                // 开发模式下验证 getFilter() 返回相同实例
+                if (log.isDebugEnabled()) {
+                    Filter filter1 = plugin.getFilter();
+                    Filter filter2 = plugin.getFilter();
+                    if (filter1 != filter2) {
+                        log.warn("Security auto-configuration: Plugin [{}] getFilter() returns different instances! " +
+                                "This may cause duplicate filters in the chain. Please cache the filter instance.",
+                                plugin.getName());
+                    }
+                }
+
+                switch (plugin.getPosition()) {
+                    case BEFORE:
+                        http.addFilterBefore(plugin.getFilter(), plugin.getTargetFilterClass());
+                        break;
+                    case AFTER:
+                        http.addFilterAfter(plugin.getFilter(), plugin.getTargetFilterClass());
+                        break;
+                    case AT:
+                        http.addFilterAt(plugin.getFilter(), plugin.getTargetFilterClass());
+                        break;
+                }
+            }
+        }
+        
         JwtAuthenticationFilter jwtFilter = jwtFilterProvider.getIfAvailable();
         if (jwtFilter != null) {
             log.info("Security auto-configuration: Registering JwtAuthenticationFilter");
             http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         }
             
-        return http.build();
+        SecurityFilterChain filterChain = http.build();
+        
+        if (log.isDebugEnabled()) {
+            log.debug("Security auto-configuration: Built SecurityFilterChain with the following filters:");
+            int order = 1;
+            for (Filter filter : filterChain.getFilters()) {
+                log.debug("  {} - {}", order++, filter.getClass().getSimpleName());
+            }
+        }
+            
+        return filterChain;
     }
 }
