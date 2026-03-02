@@ -66,7 +66,7 @@ development_status:
   # Epic 3: 授权与权限控制
   epic-3: in-progress
   3-1-preauthorize-support: done
-  3-2-role-permission-data-model: backlog
+  3-2-role-permission-data-model: done
   3-3-permission-evaluation-service: backlog
   3-4-role-management-api: backlog
   3-5-dynamic-permission-loading: backlog
