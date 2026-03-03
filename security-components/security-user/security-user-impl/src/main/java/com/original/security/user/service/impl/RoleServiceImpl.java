@@ -1,5 +1,8 @@
 package com.original.security.user.service.impl;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.original.security.config.SecurityProperties;
 import com.original.security.user.api.dto.request.PermissionAssignRequest;
 import com.original.security.user.api.dto.request.RoleCreateRequest;
 import com.original.security.user.api.dto.response.PageDTO;
@@ -27,9 +30,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -40,38 +41,42 @@ import java.util.stream.Collectors;
 @Service
 public class RoleServiceImpl implements RoleService {
 
-    private static final int MAX_CACHE_SIZE = 1000;
-
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
     private final RoleHierarchy roleHierarchy;
     private final ApplicationEventPublisher eventPublisher;
+    private final SecurityProperties securityProperties;
 
-    private final Map<String, Set<String>> roleCache =
-            Collections.synchronizedMap(new LinkedHashMap<String, Set<String>>(16, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, Set<String>> eldest) {
-                    return size() > MAX_CACHE_SIZE;
-                }
-            });
+    /**
+     * 用户角色缓存
+     */
+    private final Cache<String, Set<String>> roleCache;
 
     public RoleServiceImpl(UserRepository userRepository,
                            RoleRepository roleRepository,
                            PermissionRepository permissionRepository,
                            ApplicationEventPublisher eventPublisher,
+                           SecurityProperties securityProperties,
                            @Nullable RoleHierarchy roleHierarchy) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
         this.eventPublisher = eventPublisher;
+        this.securityProperties = securityProperties;
         this.roleHierarchy = roleHierarchy;
+
+        SecurityProperties.Cache cacheConfig = securityProperties.getCache();
+        this.roleCache = Caffeine.newBuilder()
+                .maximumSize(cacheConfig.getMaxPoolSize())
+                .expireAfterWrite(cacheConfig.getTtlMinutes(), java.util.concurrent.TimeUnit.MINUTES)
+                .build();
     }
 
     @Override
     @Transactional(readOnly = true)
     public boolean hasRole(String username, String role) {
-        if (username == null || role == null || username.trim().isEmpty() || role.trim().isEmpty()) {
+        if (username == null || role == null || username.trim().isEmpty() || role.trim().isEmpty()) {     
             return false;
         }
 
@@ -80,25 +85,13 @@ public class RoleServiceImpl implements RoleService {
     }
 
     private Set<String> getOrLoadRoles(String username) {
-        Set<String> cached = roleCache.get(username);
-        if (cached != null) {
-            return cached;
-        }
-
-        Optional<User> userOpt = userRepository.findByUsername(username);
-        if (!userOpt.isPresent() || !userOpt.get().isEnabled()) {
-            return null;
-        }
-        Set<String> loaded = Collections.unmodifiableSet(loadRolesFromUser(userOpt.get()));
-
-        synchronized (roleCache) {
-            Set<String> existing = roleCache.get(username);
-            if (existing == null) {
-                roleCache.put(username, loaded);
-                return loaded;
+        return roleCache.get(username, key -> {
+            Optional<User> userOpt = userRepository.findByUsername(key);
+            if (!userOpt.isPresent() || !userOpt.get().isEnabled()) {
+                return Collections.emptySet();
             }
-            return existing;
-        }
+            return Collections.unmodifiableSet(loadRolesFromUser(userOpt.get()));
+        });
     }
 
     private boolean matchesRole(Set<String> userRoles, String role) {
@@ -108,7 +101,7 @@ public class RoleServiceImpl implements RoleService {
 
         if (roleHierarchy != null) {
             Collection<GrantedAuthority> authorities = userRoles.stream()
-                    .map(r -> new SimpleGrantedAuthority(r.startsWith("ROLE_") ? r : "ROLE_" + r))
+                    .map(r -> new SimpleGrantedAuthority(r.startsWith("ROLE_") ? r : "ROLE_" + r))        
                     .collect(Collectors.toList());
 
             Collection<? extends GrantedAuthority> reachableAuthorities =
@@ -131,13 +124,13 @@ public class RoleServiceImpl implements RoleService {
     @Override
     public void clearCache(String username) {
         if (username != null) {
-            roleCache.remove(username);
+            roleCache.invalidate(username);
         }
     }
 
     @Override
     public void clearAllCache() {
-        roleCache.clear();
+        roleCache.invalidateAll();
     }
 
     @Override
@@ -149,7 +142,6 @@ public class RoleServiceImpl implements RoleService {
         Role role = new Role();
         role.setName(request.getName());
         role.setDescription(request.getDescription());
-        // createdAt 由 Role 实体的 @PrePersist 钩子自动设置，此处无需手动赋值（MEDIUM-4）
         role = roleRepository.save(role);
         return convertToDTO(role);
     }
@@ -160,12 +152,10 @@ public class RoleServiceImpl implements RoleService {
         Role role = roleRepository.findById(roleId)
                 .orElseThrow(() -> new IllegalArgumentException("Role not found: " + roleId));
 
-        // NEW-MEDIUM-1: 先对 permissionIds 去重，防止重复 ID 导致 size 比较误判
         List<Long> requestedIds = request.getPermissionIds().stream()
                 .distinct()
                 .collect(Collectors.toList());
 
-        // 校验请求的 permissionIds 是否全部存在于数据库，防止静默忽略无效 ID
         List<Permission> foundPermissions = new ArrayList<>(permissionRepository.findAllById(requestedIds));
         if (foundPermissions.size() != requestedIds.size()) {
             Set<Long> foundIds = foundPermissions.stream()
@@ -177,15 +167,11 @@ public class RoleServiceImpl implements RoleService {
             throw new IllegalArgumentException("Permission IDs not found: " + missingIds);
         }
 
-        // 增量追加权限，而非全量替换，保留角色已有权限
         Set<Permission> permissionsToAdd = new HashSet<>(foundPermissions);
         role.getPermissions().addAll(permissionsToAdd);
         roleRepository.save(role);
 
-        // NEW-HIGH-2: 缓存清理和事件发布必须在事务提交后执行，
-        // 防止其他线程在事务提交前读回未提交的旧数据并刷新缓存（数据竞争）。
-        // 通过发布内部事件，由 @TransactionalEventListener(AFTER_COMMIT) 处理后置逻辑。
-        eventPublisher.publishEvent(new RolePermissionAssignedEvent(this, role.getName(), requestedIds));
+        eventPublisher.publishEvent(new RolePermissionAssignedEvent(this, role.getName(), requestedIds)); 
     }
 
     @Override
@@ -199,18 +185,17 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional(readOnly = true)
     public PageDTO<RoleDTO> listRoles(int page, int size) {
-        // R3-MEDIUM-2: 分页参数边界校验，防止无效输入穿透至 Spring Data 抛出不友好的 500 异常
         if (page < 0) {
-            throw new IllegalArgumentException("Page index must not be less than zero, got: " + page);
+            throw new IllegalArgumentException("Page index must not be less than zero, got: " + page);    
         }
         if (size < 1 || size > 100) {
-            throw new IllegalArgumentException("Page size must be between 1 and 100, got: " + size);
+            throw new IllegalArgumentException("Page size must be between 1 and 100, got: " + size);      
         }
         Page<Role> rolePage = roleRepository.findAll(PageRequest.of(page, size));
         List<RoleDTO> content = rolePage.getContent().stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
-        return new PageDTO<>(content, rolePage.getTotalElements(), rolePage.getTotalPages(), 
+        return new PageDTO<>(content, rolePage.getTotalElements(), rolePage.getTotalPages(),
                              rolePage.getSize(), rolePage.getNumber());
     }
 

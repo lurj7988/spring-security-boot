@@ -1,5 +1,8 @@
 package com.original.security.user.service.impl;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.original.security.config.SecurityProperties;
 import com.original.security.user.entity.Permission;
 import com.original.security.user.entity.Role;
 import com.original.security.user.entity.User;
@@ -10,57 +13,33 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * 权限服务实现
- *
- * <p>使用有界 LRU 缓存（最多 {@value #MAX_CACHE_SIZE} 个用户）存储权限信息，
- * 避免频繁查询数据库。当用户权限发生变更时，需调用 {@link #clearCache(String)}
- * 或 {@link #clearAllCache()} 使缓存失效。
- *
- * <p><b>缓存策略：</b> 仅缓存存在且已启用的用户的权限集合。
- * 用户不存在或已禁用时不缓存，以支持后续账户启用无需手动清除缓存。
- *
- * <p><b>线程安全：</b> 采用双重检查锁定（DCL）模式保证缓存填充的线程安全性。
- * DB 查询在锁外执行（避免锁竞争），put-if-absent 在 {@code synchronized(permissionCache)}
- * 块内完成（保证原子性）。在极端并发场景下，同一用户至多触发一次重复 DB 查询（正确性不受影响）。
- *
- * @author Original Security Team
- * @since 1.0.0
  */
 @Service
 public class PermissionServiceImpl implements PermissionService {
 
-    /** 最大缓存用户数，防止内存无限增长 */
-    private static final int MAX_CACHE_SIZE = 1000;
-
     private final UserRepository userRepository;
+    private final SecurityProperties securityProperties;
 
     /**
-     * 有界 LRU 权限缓存 (username -> 不可变权限名称集合)，最多缓存 MAX_CACHE_SIZE 个用户。
-     * 使用 Collections.synchronizedMap 包装以保证单个 get/put 操作的线程安全性；
-     * 复合的 get-or-load-and-put 操作通过 synchronized(permissionCache) 块保证原子性。
+     * 用户权限缓存
      */
-    private final Map<String, Set<String>> permissionCache =
-            Collections.synchronizedMap(new LinkedHashMap<String, Set<String>>(16, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, Set<String>> eldest) {
-                    return size() > MAX_CACHE_SIZE;
-                }
-            });
+    private final Cache<String, Set<String>> permissionCache;
 
-    /**
-     * 构造器注入 (AC 3.1 强制要求)
-     *
-     * @param userRepository 用户数据访问接口
-     */
-    public PermissionServiceImpl(UserRepository userRepository) {
+    public PermissionServiceImpl(UserRepository userRepository, SecurityProperties securityProperties) {
         this.userRepository = userRepository;
+        this.securityProperties = securityProperties;
+        
+        SecurityProperties.Cache cacheConfig = securityProperties.getCache();
+        this.permissionCache = Caffeine.newBuilder()
+                .maximumSize(cacheConfig.getMaxPoolSize())
+                .expireAfterWrite(cacheConfig.getTtlMinutes(), java.util.concurrent.TimeUnit.MINUTES)
+                .build();
     }
 
     @Override
@@ -74,42 +53,18 @@ public class PermissionServiceImpl implements PermissionService {
         return userPermissions != null && userPermissions.contains(permission);
     }
 
-    /**
-     * 线程安全的缓存获取或加载方法（双重检查锁定模式）。
-     *
-     * <p>返回 null 表示用户不存在或已禁用（结果不缓存）。
-     */
     private Set<String> getOrLoadPermissions(String username) {
-        // Step 1: 快速路径 — 检查缓存（synchronizedMap 保证单方法线程安全）
-        Set<String> cached = permissionCache.get(username);
-        if (cached != null) {
-            return cached;
-        }
-
-        // Step 2: 慢速路径 — 从数据库加载（在锁外执行，避免序列化所有权限检查）(AC 1.1, 2.3)
-        Optional<User> userOpt = userRepository.findByUsername(username);
-        if (!userOpt.isPresent() || !userOpt.get().isEnabled()) {
-            // 用户不存在或已禁用：不缓存，确保账户启用后无需手动清除缓存
-            return null;
-        }
-        Set<String> loaded = Collections.unmodifiableSet(loadPermissionsFromUser(userOpt.get()));
-
-        // Step 3: 原子性 put-if-absent — 在锁内双重检查，防止并发写入（AC 1.2）
-        // Collections.synchronizedMap 的监视器即为 permissionCache 本身
-        synchronized (permissionCache) {
-            Set<String> existing = permissionCache.get(username);
-            if (existing == null) {
-                permissionCache.put(username, loaded);
-                return loaded;
+        return permissionCache.get(username, key -> {
+            Optional<User> userOpt = userRepository.findByUsername(key);
+            // 负向缓存：如果用户不存在或已禁用，返回一个空集（不可变），而不是 null。
+            // Caffeine 会缓存此空集，从而避免频繁查库。
+            if (!userOpt.isPresent() || !userOpt.get().isEnabled()) {
+                return Collections.emptySet();
             }
-            // 另一线程已先行写入，使用已缓存的结果
-            return existing;
-        }
+            return Collections.unmodifiableSet(loadPermissionsFromUser(userOpt.get()));
+        });
     }
 
-    /**
-     * 从 User 实体中提取所有权限名称 (User -> Roles -> Permissions)
-     */
     private Set<String> loadPermissionsFromUser(User user) {
         Set<String> permissions = new HashSet<>();
         for (Role role : user.getRoles()) {
@@ -126,12 +81,12 @@ public class PermissionServiceImpl implements PermissionService {
     @Override
     public void clearCache(String username) {
         if (username != null) {
-            permissionCache.remove(username);
+            permissionCache.invalidate(username);
         }
     }
 
     @Override
     public void clearAllCache() {
-        permissionCache.clear();
+        permissionCache.invalidateAll();
     }
 }

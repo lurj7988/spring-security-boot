@@ -1,5 +1,6 @@
 package com.original.security.user.service.impl;
 
+import com.original.security.config.SecurityProperties;
 import com.original.security.user.api.dto.request.PermissionAssignRequest;
 import com.original.security.user.api.dto.request.RoleCreateRequest;
 import com.original.security.user.api.dto.response.PageDTO;
@@ -50,13 +51,17 @@ class RoleServiceImplTest {
     @Mock
     private RoleHierarchy roleHierarchy;
 
+    @Mock
+    private SecurityProperties securityProperties;
+
     private RoleServiceImpl roleServiceWithHierarchy;
     private RoleServiceImpl roleServiceWithoutHierarchy;
 
     @BeforeEach
     void setUp() {
-        roleServiceWithHierarchy = new RoleServiceImpl(userRepository, roleRepository, permissionRepository, eventPublisher, roleHierarchy);
-        roleServiceWithoutHierarchy = new RoleServiceImpl(userRepository, roleRepository, permissionRepository, eventPublisher, null);
+        when(securityProperties.getCache()).thenReturn(new SecurityProperties.Cache());
+        roleServiceWithHierarchy = new RoleServiceImpl(userRepository, roleRepository, permissionRepository, eventPublisher, securityProperties, roleHierarchy);
+        roleServiceWithoutHierarchy = new RoleServiceImpl(userRepository, roleRepository, permissionRepository, eventPublisher, securityProperties, null);
     }
 
     // NEW-MEDIUM-2: 所有测试方法遵循 test{MethodName}_{Scenario}_{ExpectedResult} 命名约定

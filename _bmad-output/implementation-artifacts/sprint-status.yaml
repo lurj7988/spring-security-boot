@@ -69,7 +69,7 @@ development_status:
   3-2-role-permission-data-model: done
   3-3-permission-evaluation-service: done
   3-4-role-management-api: done
-  3-5-dynamic-permission-loading: backlog
+  3-5-dynamic-permission-loading: done
   epic-3-retrospective: optional
 
   # Epic 4: 会话管理

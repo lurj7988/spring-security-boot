@@ -7,6 +7,7 @@ import com.original.security.user.api.dto.response.PageDTO;
 import com.original.security.user.api.dto.response.RoleDTO;
 import com.original.security.user.event.RoleCacheEvictionListener;
 import com.original.security.user.event.RolePermissionAssignedEventListener;
+import com.original.security.user.service.PermissionService;
 import com.original.security.user.service.RoleService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,9 @@ class RoleControllerTest {
     @MockBean
     private RoleService roleService;
 
+    @MockBean
+    private PermissionService permissionService;
+
     /**
      * 显式 Mock 事件监听器，防止 @WebMvcTest 切片加载异步/事务组件
      */
@@ -48,7 +52,6 @@ class RoleControllerTest {
 
     @Test
     @WithMockUser
-    // NEW-MEDIUM-2: 遵循 test{MethodName}_{Scenario}_{ExpectedResult} 命名约定
     void testCreateRole_ValidRequest_ReturnsSuccess() throws Exception {
         RoleCreateRequest request = new RoleCreateRequest();
         request.setName("TEST_ROLE");
@@ -92,7 +95,6 @@ class RoleControllerTest {
     @Test
     @WithMockUser
     void testCreateRole_BlankName_Returns400() throws Exception {
-        // 验证 JSR-303 @NotBlank 校验失败时由 MethodArgumentNotValidException 处理器返回 400
         RoleCreateRequest request = new RoleCreateRequest();
         request.setName(""); // blank name
 
@@ -158,5 +160,30 @@ class RoleControllerTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.content[0].name").value("TEST_ROLE"));
+    }
+
+    @Test
+    @WithMockUser
+    void testClearCache_SpecificUser_ReturnsSuccess() throws Exception {
+        mockMvc.perform(delete("/api/roles/cache")
+                .param("username", "admin")
+                .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(roleService).clearCache("admin");
+        verify(permissionService).clearCache("admin");
+    }
+
+    @Test
+    @WithMockUser
+    void testClearCache_AllUsers_ReturnsSuccess() throws Exception {
+        mockMvc.perform(delete("/api/roles/cache")
+                .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(roleService).clearAllCache();
+        verify(permissionService).clearAllCache();
     }
 }

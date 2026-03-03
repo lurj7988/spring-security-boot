@@ -31,6 +31,6 @@ public class RolePermissionAssignedEventListener {
         log.info("[AUDIT] Role permission assignment: roleName={}, permissionIds={}, timestamp={}",
                 event.getRoleName(),
                 event.getPermissionIds(),
-                event.getTimestamp());
+                event.getAssignedAt());
     }
 }

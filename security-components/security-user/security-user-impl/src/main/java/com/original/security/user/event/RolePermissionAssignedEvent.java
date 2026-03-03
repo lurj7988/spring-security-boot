@@ -12,13 +12,13 @@ public class RolePermissionAssignedEvent extends ApplicationEvent {
 
     private final String roleName;
     private final List<Long> permissionIds;
-    private final LocalDateTime timestamp;
+    private final LocalDateTime assignedAt;
 
     public RolePermissionAssignedEvent(Object source, String roleName, List<Long> permissionIds) {
         super(source);
         this.roleName = roleName;
         this.permissionIds = Collections.unmodifiableList(permissionIds);
-        this.timestamp = LocalDateTime.now();
+        this.assignedAt = LocalDateTime.now();
     }
 
     public String getRoleName() {
@@ -30,7 +30,7 @@ public class RolePermissionAssignedEvent extends ApplicationEvent {
         return permissionIds;
     }
 
-    public LocalDateTime getTimestamp() {
-        return timestamp;
+    public LocalDateTime getAssignedAt() {
+        return assignedAt;
     }
 }

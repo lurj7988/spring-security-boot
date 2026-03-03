@@ -27,4 +27,10 @@ public interface RoleApi {
     @GetMapping
     Response<PageDTO<RoleDTO>> listRoles(@RequestParam(value = "page", defaultValue = "0") int page,
                                          @RequestParam(value = "size", defaultValue = "10") int size);
+
+    /**
+     * 手动清除权限和角色缓存 (AC 2)
+     */
+    @DeleteMapping("/cache")
+    Response<Void> clearCache(@RequestParam(value = "username", required = false) String username);
 }

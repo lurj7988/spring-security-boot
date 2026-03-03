@@ -1,5 +1,6 @@
 package com.original.security.user.event;
 
+import com.original.security.user.service.PermissionService;
 import com.original.security.user.service.RoleService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,7 +11,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 /**
  * 角色缓存失效监听器
  *
- * <p>在角色权限变更事务提交后清理角色缓存，确保后续查询读取到最新数据。
+ * <p>在角色权限变更事务提交后清理角色缓存和权限缓存，确保后续查询读取到最新数据。
  * 与 {@link RolePermissionAssignedEventListener}（审计日志）分离，遵循单一职责原则。
  *
  * @author Original Security Team
@@ -22,9 +23,11 @@ public class RoleCacheEvictionListener {
     private static final Logger log = LoggerFactory.getLogger(RoleCacheEvictionListener.class);
 
     private final RoleService roleService;
+    private final PermissionService permissionService;
 
-    public RoleCacheEvictionListener(RoleService roleService) {
+    public RoleCacheEvictionListener(RoleService roleService, PermissionService permissionService) {
         this.roleService = roleService;
+        this.permissionService = permissionService;
     }
 
     /**
@@ -37,7 +40,8 @@ public class RoleCacheEvictionListener {
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPermissionAssigned(RolePermissionAssignedEvent event) {
-        log.debug("Evicting role cache after permission assignment for role: {}", event.getRoleName());
+        log.debug("Evicting role and permission caches after permission assignment for role: {}", event.getRoleName());
         roleService.clearAllCache();
+        permissionService.clearAllCache();
     }
 }

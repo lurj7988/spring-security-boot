@@ -6,11 +6,13 @@ import com.original.security.user.api.dto.request.PermissionAssignRequest;
 import com.original.security.user.api.dto.request.RoleCreateRequest;
 import com.original.security.user.api.dto.response.PageDTO;
 import com.original.security.user.api.dto.response.RoleDTO;
+import com.original.security.user.service.PermissionService;
 import com.original.security.user.service.RoleService;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.stream.Collectors;
@@ -20,9 +22,11 @@ import java.util.stream.Collectors;
 public class RoleController implements RoleApi {
 
     private final RoleService roleService;
+    private final PermissionService permissionService;
 
-    public RoleController(RoleService roleService) {
+    public RoleController(RoleService roleService, PermissionService permissionService) {
         this.roleService = roleService;
+        this.permissionService = permissionService;
     }
 
     @Override
@@ -47,6 +51,18 @@ public class RoleController implements RoleApi {
     public Response<PageDTO<RoleDTO>> listRoles(int page, int size) {
         PageDTO<RoleDTO> roles = roleService.listRoles(page, size);
         return Response.successBuilder(roles).build();
+    }
+
+    @Override
+    public Response<Void> clearCache(@RequestParam(value = "username", required = false) String username) {
+        if (username != null && !username.trim().isEmpty()) {
+            roleService.clearCache(username);
+            permissionService.clearCache(username);
+        } else {
+            roleService.clearAllCache();
+            permissionService.clearAllCache();
+        }
+        return Response.<Void>successBuilder(null).build();
     }
 
     /**

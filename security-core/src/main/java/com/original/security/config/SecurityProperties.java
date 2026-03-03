@@ -58,4 +58,48 @@ public class SecurityProperties {
             this.validation = validation;
         }
     }
+
+    private final Cache cache = new Cache();
+
+    /**
+     * Returns the cache settings for the security framework.
+     *
+     * @return the cache settings
+     */
+    public Cache getCache() {
+        return cache;
+    }
+
+    /**
+     * Cache configuration settings.
+     */
+    public static class Cache {
+        /**
+         * Maximum number of entries to keep in the cache.
+         * Default is 1000.
+         */
+        private int maxPoolSize = 1000;
+
+        /**
+         * Time-to-live for cache entries in minutes.
+         * Default is 30 minutes.
+         */
+        private long ttlMinutes = 30;
+
+        public int getMaxPoolSize() {
+            return maxPoolSize;
+        }
+
+        public void setMaxPoolSize(int maxPoolSize) {
+            this.maxPoolSize = maxPoolSize;
+        }
+
+        public long getTtlMinutes() {
+            return ttlMinutes;
+        }
+
+        public void setTtlMinutes(long ttlMinutes) {
+            this.ttlMinutes = ttlMinutes;
+        }
+    }
 }

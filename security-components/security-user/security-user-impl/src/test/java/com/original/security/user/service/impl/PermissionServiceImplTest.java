@@ -1,5 +1,6 @@
 package com.original.security.user.service.impl;
 
+import com.original.security.config.SecurityProperties;
 import com.original.security.user.entity.Permission;
 import com.original.security.user.entity.Role;
 import com.original.security.user.entity.User;
@@ -21,11 +22,15 @@ class PermissionServiceImplTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private SecurityProperties securityProperties;
+
     private PermissionServiceImpl permissionService;
 
     @BeforeEach
     void setUp() {
-        permissionService = new PermissionServiceImpl(userRepository);
+        when(securityProperties.getCache()).thenReturn(new SecurityProperties.Cache());
+        permissionService = new PermissionServiceImpl(userRepository, securityProperties);
     }
 
     @Test
@@ -90,8 +95,8 @@ class PermissionServiceImplTest {
     }
 
     @Test
-    void hasPermission_ShouldNotCacheDisabledUser_SoSubsequentCallsRecheck() {
-        // 禁用用户不应被缓存，以便账户启用后能正常授权
+    void hasPermission_ShouldNegativeCacheDisabledUser_UntilCleared() {
+        // 禁用用户应被负向缓存，以防止频繁查询 DB
         User disabledUser = new User("target", "pwd", "target@test.com");
         disabledUser.setEnabled(false);
         when(userRepository.findByUsername("target")).thenReturn(Optional.of(disabledUser));
@@ -106,9 +111,12 @@ class PermissionServiceImplTest {
         enabledUser.addRole(role);
         when(userRepository.findByUsername("target")).thenReturn(Optional.of(enabledUser));
 
-        // 若禁用状态被缓存，这里会错误地返回 false
+        // 由于实施了负向缓存，必须手动清理或等待失效
+        permissionService.clearCache("target");
+
+        // 现在应该能正常授权
         assertTrue(permissionService.hasPermission("target", "user:read"));
-        // 两次都查了数据库，说明禁用时结果未被缓存
+        // 两次都查了数据库（因为中间手工清了缓存）
         verify(userRepository, times(2)).findByUsername("target");
     }
 
