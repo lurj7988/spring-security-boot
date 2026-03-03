@@ -1,9 +1,21 @@
 package com.original.security.user.service.impl;
 
+import com.original.security.user.api.dto.request.PermissionAssignRequest;
+import com.original.security.user.api.dto.request.RoleCreateRequest;
+import com.original.security.user.api.dto.response.PageDTO;
+import com.original.security.user.api.dto.response.PermissionDTO;
+import com.original.security.user.api.dto.response.RoleDTO;
+import com.original.security.user.entity.Permission;
 import com.original.security.user.entity.Role;
 import com.original.security.user.entity.User;
+import com.original.security.user.event.RolePermissionAssignedEvent;
+import com.original.security.user.repository.PermissionRepository;
+import com.original.security.user.repository.RoleRepository;
 import com.original.security.user.repository.UserRepository;
 import com.original.security.user.service.RoleService;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.lang.Nullable;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.GrantedAuthority;
@@ -11,50 +23,31 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 角色服务实现
- *
- * <p>使用有界 LRU 缓存（最多 {@value #MAX_CACHE_SIZE} 个用户）存储角色信息，
- * 避免频繁查询数据库。当用户角色发生变更时，需调用 {@link #clearCache(String)}
- * 或 {@link #clearAllCache()} 使缓存失效。
- *
- * <p>支持通过可选的 {@link RoleHierarchy} Bean 进行角色继承解析（AC 2.1）。
- * 注意：缓存存储的是用户直接拥有的角色名称集合，{@link RoleHierarchy} 的继承解析
- * 在每次 {@link #hasRole} 调用时实时执行，因此运行时修改 {@code RoleHierarchy}
- * 无需清除此缓存。
- *
- * <p><b>缓存策略：</b> 仅缓存存在且已启用的用户的角色集合。
- * 用户不存在或已禁用时不缓存，以支持后续账户启用无需手动清除缓存。
- *
- * <p><b>线程安全：</b> 采用双重检查锁定（DCL）模式保证缓存填充的线程安全性。
- * DB 查询在锁外执行（避免锁竞争），put-if-absent 在 {@code synchronized(roleCache)}
- * 块内完成（保证原子性）。
- *
- * @author Original Security Team
- * @since 1.0.0
+ * Role service implementation
  */
 @Service
 public class RoleServiceImpl implements RoleService {
 
-    /** 最大缓存用户数，防止内存无限增长 */
     private static final int MAX_CACHE_SIZE = 1000;
 
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final PermissionRepository permissionRepository;
     private final RoleHierarchy roleHierarchy;
+    private final ApplicationEventPublisher eventPublisher;
 
-    /**
-     * 有界 LRU 角色缓存 (username -> 不可变角色名称集合)，最多缓存 MAX_CACHE_SIZE 个用户。
-     * 使用 Collections.synchronizedMap 包装以保证单个 get/put 操作的线程安全性；
-     * 复合的 get-or-load-and-put 操作通过 synchronized(roleCache) 块保证原子性。
-     */
     private final Map<String, Set<String>> roleCache =
             Collections.synchronizedMap(new LinkedHashMap<String, Set<String>>(16, 0.75f, true) {
                 @Override
@@ -63,15 +56,15 @@ public class RoleServiceImpl implements RoleService {
                 }
             });
 
-    /**
-     * 构造器注入 (AC 3.1 强制要求)
-     *
-     * @param userRepository 用户数据访问接口
-     * @param roleHierarchy  角色继承关系（可选，为 null 时禁用角色继承）
-     */
     public RoleServiceImpl(UserRepository userRepository,
+                           RoleRepository roleRepository,
+                           PermissionRepository permissionRepository,
+                           ApplicationEventPublisher eventPublisher,
                            @Nullable RoleHierarchy roleHierarchy) {
         this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.permissionRepository = permissionRepository;
+        this.eventPublisher = eventPublisher;
         this.roleHierarchy = roleHierarchy;
     }
 
@@ -86,27 +79,18 @@ public class RoleServiceImpl implements RoleService {
         return userRoles != null && matchesRole(userRoles, role);
     }
 
-    /**
-     * 线程安全的缓存获取或加载方法（双重检查锁定模式）。
-     *
-     * <p>返回 null 表示用户不存在或已禁用（结果不缓存）。
-     */
     private Set<String> getOrLoadRoles(String username) {
-        // Step 1: 快速路径 — 检查缓存（synchronizedMap 保证单方法线程安全）
         Set<String> cached = roleCache.get(username);
         if (cached != null) {
             return cached;
         }
 
-        // Step 2: 慢速路径 — 从数据库加载（在锁外执行，避免序列化所有角色检查）
         Optional<User> userOpt = userRepository.findByUsername(username);
         if (!userOpt.isPresent() || !userOpt.get().isEnabled()) {
-            // 用户不存在或已禁用：不缓存，确保账户启用后无需手动清除缓存
             return null;
         }
         Set<String> loaded = Collections.unmodifiableSet(loadRolesFromUser(userOpt.get()));
 
-        // Step 3: 原子性 put-if-absent — 在锁内双重检查，防止并发写入
         synchronized (roleCache) {
             Set<String> existing = roleCache.get(username);
             if (existing == null) {
@@ -117,19 +101,11 @@ public class RoleServiceImpl implements RoleService {
         }
     }
 
-    /**
-     * 检查角色集合中是否包含指定角色（含继承关系匹配）。
-     *
-     * <p>注意：{@link RoleHierarchy} 的继承解析实时执行，不受角色缓存影响，
-     * 因此修改角色层级关系无需清除角色缓存。
-     */
     private boolean matchesRole(Set<String> userRoles, String role) {
-        // 直接匹配 (AC 2.1)
         if (userRoles.contains(role)) {
             return true;
         }
 
-        // 角色继承匹配 (AC 2.1)
         if (roleHierarchy != null) {
             Collection<GrantedAuthority> authorities = userRoles.stream()
                     .map(r -> new SimpleGrantedAuthority(r.startsWith("ROLE_") ? r : "ROLE_" + r))
@@ -146,9 +122,6 @@ public class RoleServiceImpl implements RoleService {
         return false;
     }
 
-    /**
-     * 从 User 实体中提取所有角色名称 (User -> Roles)
-     */
     private Set<String> loadRolesFromUser(User user) {
         return user.getRoles().stream()
                 .map(Role::getName)
@@ -165,5 +138,99 @@ public class RoleServiceImpl implements RoleService {
     @Override
     public void clearAllCache() {
         roleCache.clear();
+    }
+
+    @Override
+    @Transactional
+    public RoleDTO createRole(RoleCreateRequest request) {
+        if (roleRepository.findByName(request.getName()).isPresent()) {
+            throw new IllegalArgumentException("Role name already exists: " + request.getName());
+        }
+        Role role = new Role();
+        role.setName(request.getName());
+        role.setDescription(request.getDescription());
+        // createdAt 由 Role 实体的 @PrePersist 钩子自动设置，此处无需手动赋值（MEDIUM-4）
+        role = roleRepository.save(role);
+        return convertToDTO(role);
+    }
+
+    @Override
+    @Transactional
+    public void assignPermissions(Long roleId, PermissionAssignRequest request) {
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new IllegalArgumentException("Role not found: " + roleId));
+
+        // NEW-MEDIUM-1: 先对 permissionIds 去重，防止重复 ID 导致 size 比较误判
+        List<Long> requestedIds = request.getPermissionIds().stream()
+                .distinct()
+                .collect(Collectors.toList());
+
+        // 校验请求的 permissionIds 是否全部存在于数据库，防止静默忽略无效 ID
+        List<Permission> foundPermissions = new ArrayList<>(permissionRepository.findAllById(requestedIds));
+        if (foundPermissions.size() != requestedIds.size()) {
+            Set<Long> foundIds = foundPermissions.stream()
+                    .map(Permission::getId)
+                    .collect(Collectors.toSet());
+            List<Long> missingIds = requestedIds.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .collect(Collectors.toList());
+            throw new IllegalArgumentException("Permission IDs not found: " + missingIds);
+        }
+
+        // 增量追加权限，而非全量替换，保留角色已有权限
+        Set<Permission> permissionsToAdd = new HashSet<>(foundPermissions);
+        role.getPermissions().addAll(permissionsToAdd);
+        roleRepository.save(role);
+
+        // NEW-HIGH-2: 缓存清理和事件发布必须在事务提交后执行，
+        // 防止其他线程在事务提交前读回未提交的旧数据并刷新缓存（数据竞争）。
+        // 通过发布内部事件，由 @TransactionalEventListener(AFTER_COMMIT) 处理后置逻辑。
+        eventPublisher.publishEvent(new RolePermissionAssignedEvent(this, role.getName(), requestedIds));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RoleDTO getRole(Long roleId) {
+        Role role = roleRepository.findById(roleId)
+                .orElseThrow(() -> new IllegalArgumentException("Role not found"));
+        return convertToDTO(role);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageDTO<RoleDTO> listRoles(int page, int size) {
+        // R3-MEDIUM-2: 分页参数边界校验，防止无效输入穿透至 Spring Data 抛出不友好的 500 异常
+        if (page < 0) {
+            throw new IllegalArgumentException("Page index must not be less than zero, got: " + page);
+        }
+        if (size < 1 || size > 100) {
+            throw new IllegalArgumentException("Page size must be between 1 and 100, got: " + size);
+        }
+        Page<Role> rolePage = roleRepository.findAll(PageRequest.of(page, size));
+        List<RoleDTO> content = rolePage.getContent().stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+        return new PageDTO<>(content, rolePage.getTotalElements(), rolePage.getTotalPages(), 
+                             rolePage.getSize(), rolePage.getNumber());
+    }
+
+    private RoleDTO convertToDTO(Role role) {
+        RoleDTO dto = new RoleDTO();
+        dto.setId(role.getId());
+        dto.setName(role.getName());
+        dto.setDescription(role.getDescription());
+        dto.setCreatedAt(role.getCreatedAt());
+        if (role.getPermissions() != null) {
+            List<PermissionDTO> pDtos = role.getPermissions().stream().map(p -> {
+                PermissionDTO pd = new PermissionDTO();
+                pd.setId(p.getId());
+                pd.setName(p.getName());
+                pd.setDescription(p.getDescription());
+                pd.setCreatedAt(p.getCreatedAt());
+                return pd;
+            }).collect(Collectors.toList());
+            dto.setPermissions(pDtos);
+        }
+        return dto;
     }
 }

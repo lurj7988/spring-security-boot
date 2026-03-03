@@ -1,5 +1,10 @@
 package com.original.security.user.service;
 
+import com.original.security.user.api.dto.request.PermissionAssignRequest;
+import com.original.security.user.api.dto.request.RoleCreateRequest;
+import com.original.security.user.api.dto.response.PageDTO;
+import com.original.security.user.api.dto.response.RoleDTO;
+
 /**
  * 角色服务接口
  *
@@ -38,4 +43,37 @@ public interface RoleService {
      * <p>进行批量角色变更操作后，可调用此方法清除全量缓存。
      */
     void clearAllCache();
+
+    /**
+     * 创建角色
+     *
+     * @param request 角色创建请求
+     * @return 创建后的角色信息
+     */
+    RoleDTO createRole(RoleCreateRequest request);
+
+    /**
+     * 为角色分配权限
+     *
+     * @param roleId 角色ID
+     * @param request 权限分配请求
+     */
+    void assignPermissions(Long roleId, PermissionAssignRequest request);
+
+    /**
+     * 获取角色详情
+     *
+     * @param roleId 角色ID
+     * @return 角色详情
+     */
+    RoleDTO getRole(Long roleId);
+
+    /**
+     * 分页查询角色列表
+     *
+     * @param page 页码
+     * @param size 每页大小
+     * @return 角色分页数据
+     */
+    PageDTO<RoleDTO> listRoles(int page, int size);
 }
