@@ -3,13 +3,15 @@ package com.original.security.user;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.test.context.ActiveProfiles;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @DataJpaTest
+@ActiveProfiles("schema-init")
 public class SchemaInitializationTest {
 
     private final JdbcTemplate jdbcTemplate;
@@ -21,7 +23,6 @@ public class SchemaInitializationTest {
 
     @Test
     public void testSchemaInitialized() {
-        // Test if tables exist
         Integer userCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users", Integer.class);
         assertEquals(1, userCount, "Should have 1 default user");
 
@@ -33,14 +34,38 @@ public class SchemaInitializationTest {
     }
 
     @Test
-    public void testUniqueConstraintsExist() {
-        // Rather than querying INFORMATION_SCHEMA which is dialect specific,
-        // Let's verify constraints functionally or verify column definition.
-        
-        // H2 specifically will still throw duplicate key on standard inserts
-        // Just verify basic columns exist without relying on INFORMATION_SCHEMA
-        Integer columnCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM users", Integer.class);
-        assertTrue(columnCount > 0, "Users table should exist and have data");
+    public void testUsernameUniqueConstraintEnforced() {
+        // 验证 users.username 唯一约束真正生效（功能性验证，而非查询 INFORMATION_SCHEMA）
+        assertThrows(DataIntegrityViolationException.class, () ->
+                jdbcTemplate.update(
+                        "INSERT INTO users (username, password, email, enabled) VALUES (?, ?, ?, ?)",
+                        "admin", "encoded_password", "duplicate@test.com", true
+                ),
+                "Inserting duplicate username should throw DataIntegrityViolationException"
+        );
+    }
+
+    @Test
+    public void testRoleNameUniqueConstraintEnforced() {
+        // 验证 roles.name 唯一约束真正生效
+        assertThrows(DataIntegrityViolationException.class, () ->
+                jdbcTemplate.update(
+                        "INSERT INTO roles (name, description) VALUES (?, ?)",
+                        "ADMIN", "Duplicate Admin Role"
+                ),
+                "Inserting duplicate role name should throw DataIntegrityViolationException"
+        );
+    }
+
+    @Test
+    public void testPermissionNameUniqueConstraintEnforced() {
+        // 验证 permissions.name 唯一约束真正生效
+        assertThrows(DataIntegrityViolationException.class, () ->
+                jdbcTemplate.update(
+                        "INSERT INTO permissions (name, description) VALUES (?, ?)",
+                        "user:read", "Duplicate Permission"
+                ),
+                "Inserting duplicate permission name should throw DataIntegrityViolationException"
+        );
     }
 }
