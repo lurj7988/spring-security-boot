@@ -22,6 +22,10 @@ import com.original.security.handler.FrameAccessDeniedHandler;
 import com.original.security.handler.FrameAuthenticationEntryPoint;
 import com.original.security.plugin.SecurityFilterPlugin;
 
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.web.session.InvalidSessionStrategy;
+import org.springframework.security.web.session.SessionInformationExpiredStrategy;
+
 import javax.servlet.Filter;
 
 import java.util.List;
@@ -35,7 +39,7 @@ import java.util.stream.Collectors;
  * <ul>
  *     <li>{@link PasswordEncoder}: 默认使用符合安全规范的 BCryptPasswordEncoder</li>
  *     <li>{@link AuthenticationManager}: 暴露核心认证管理器</li>
- *     <li>{@link SecurityFilterChain}: 配置默认的基础拦截链，提供无状态(Stateless)等基础支撑</li>
+ *     <li>{@link SecurityFilterChain}: 配置默认的基础拦截链，根据 Session 配置动态选择有状态(IF_REQUIRED)或无状态(STATELESS)策略</li>
  * </ul>
  */
 @Configuration
@@ -94,7 +98,7 @@ public class SecurityAutoConfiguration {
      * 构建并在容器中装配默认的 SecurityFilterChain。
      * <ul>
      *     <li>禁用默认的表单登录和 Basic 认证（后续由插件式架构接管）</li>
-     *     <li>将 Session 会话管理策略配置为 STATELESS，以支持 API 无状态特性或 JWT</li>
+     *     <li>根据 Session 配置动态选择会话管理策略：有 SessionProperties 时使用 IF_REQUIRED，否则使用 STATELESS</li>
      *     <li>为后续的网络安全配置（如 CORS、CSRF）预留口子</li>
      * </ul>
      *
@@ -119,7 +123,11 @@ public class SecurityAutoConfiguration {
             ObjectProvider<SecurityHeadersProperties> headersPropertiesProvider,
             ObjectProvider<CspProperties> cspPropertiesProvider,
             ObjectProvider<FrameAuthenticationEntryPoint> authenticationEntryPointProvider,
-            ObjectProvider<SecurityFilterPlugin> filterPluginsProvider
+            ObjectProvider<SecurityFilterPlugin> filterPluginsProvider,
+            ObjectProvider<SessionProperties> sessionPropertiesProvider,
+            ObjectProvider<SessionRegistry> sessionRegistryProvider,
+            ObjectProvider<SessionInformationExpiredStrategy> sessionExpiredStrategyProvider,
+            ObjectProvider<InvalidSessionStrategy> invalidSessionStrategyProvider
     ) throws Exception {
         log.info("Security auto-configuration: Initializing basic SecurityFilterChain");
         
@@ -195,11 +203,38 @@ public class SecurityAutoConfiguration {
             .formLogin().disable()
 
             // 基础退出禁用，之后会使用我们的 Logout机制或者直接不管理
-            .logout().disable()
-            // 设置默认的会话策略为无状态
-            .sessionManagement()
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            .and()
+            .logout().disable();
+
+        // 配置会话管理
+        SessionProperties sessionProperties = sessionPropertiesProvider.getIfAvailable();
+        if (sessionProperties != null) {
+            log.info("Security auto-configuration: Configuring stateful session management");
+            http.sessionManagement(session -> {
+                session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED);
+                
+                if (sessionProperties.isFixationProtection()) {
+                    session.sessionFixation().migrateSession();
+                } else {
+                    session.sessionFixation().none();
+                }
+
+                session.maximumSessions(sessionProperties.getMaxSessions())
+                        .maxSessionsPreventsLogin(false)
+                        .sessionRegistry(sessionRegistryProvider.getIfAvailable())
+                        .expiredSessionStrategy(sessionExpiredStrategyProvider.getIfAvailable());
+
+                InvalidSessionStrategy invalidSessionStrategy = invalidSessionStrategyProvider.getIfAvailable();
+                if (invalidSessionStrategy != null) {
+                    session.invalidSessionStrategy(invalidSessionStrategy);
+                }
+            });
+        } else {
+            log.info("Security auto-configuration: Using default stateless session policy");
+            http.sessionManagement()
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+        }
+
+        http
             // 所有请求都需要认证（默认极简策略），由应用自定义更详细的权限放行
             .authorizeHttpRequests()
                 .antMatchers("/api/auth/login", "/api/auth/refresh").permitAll()
