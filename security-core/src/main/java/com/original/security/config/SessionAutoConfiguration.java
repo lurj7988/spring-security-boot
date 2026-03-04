@@ -1,14 +1,15 @@
 package com.original.security.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.original.security.handler.InvalidSessionHandler;
 import com.original.security.handler.SessionExpiredHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.servlet.ServletContextInitializer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.core.session.SessionRegistry;
@@ -44,7 +45,7 @@ import org.springframework.security.web.session.SessionInformationExpiredStrateg
 @Configuration
 @AutoConfigureBefore(SecurityAutoConfiguration.class)
 @EnableConfigurationProperties(SessionProperties.class)
-@ConditionalOnProperty(prefix = "security.session", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "security.session", name = "enabled", havingValue = "true")
 public class SessionAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(SessionAutoConfiguration.class);
@@ -61,21 +62,33 @@ public class SessionAutoConfiguration {
     }
 
     /**
-     * 创建 Session 注册表 Bean。
+     * 配置 Servlet 容器的 Session 超时时间。
      * <p>
-     * Session 注册表用于跟踪所有活跃的用户 Session，
-     * 支持并发 Session 控制和 Session 查询功能。
+     * 将 {@link SessionProperties#getTimeout()} 配置的超时时间（秒）
+     * 应用到 Servlet 容器中，确保 Session 超时配置实际生效。
      * </p>
      *
-     * @return SessionRegistry 实例
+     * @return ServletContextInitializer 实例
      */
+    @Bean
+    public ServletContextInitializer sessionTimeoutInitializer() {
+        return servletContext -> {
+            int timeoutMinutes = Math.max(1, sessionProperties.getTimeout() / 60);
+            servletContext.setSessionTimeout(timeoutMinutes);
+            log.info("Session auto-configuration: Session timeout set to {} minutes ({} seconds)",
+                    timeoutMinutes, sessionProperties.getTimeout());
+        };
+    }
+
     @Bean
     @ConditionalOnMissingBean(SessionRegistry.class)
     public SessionRegistry sessionRegistry() {
         if (sessionProperties.isRedisStore()) {
-            log.warn("Session auto-configuration: Redis store-type selected but requires 'spring-session-data-redis' and external configuration. Falling back to in-memory registry.");
+            throw new IllegalStateException(
+                    "Session store-type 'redis' requires 'spring-session-data-redis' dependency and Redis configuration. " +
+                    "Please add the dependency or change store-type to 'memory'.");
         }
-        log.info("Session auto-configuration: Registering SessionRegistry");
+        log.info("Session auto-configuration: Registering in-memory SessionRegistry");
         return new SessionRegistryImpl();
     }
 
@@ -125,21 +138,7 @@ public class SessionAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(InvalidSessionStrategy.class)
     public InvalidSessionStrategy invalidSessionStrategy(ObjectMapper objectMapper) {
-        log.info("Session auto-configuration: Registering InvalidSessionStrategy");
-        return (request, response) -> {
-            String requestUri = request.getRequestURI();
-            log.warn("Invalid session detected for request: {}", requestUri);
-
-            response.setStatus(401);
-            response.setContentType("application/json;charset=UTF-8");
-
-            com.original.security.core.Response<Object> errorResponse = 
-                com.original.security.core.Response.<Object>withBuilder(401)
-                    .msg("无效会话，请重新登录")
-                    .location(requestUri)
-                    .build();
-
-            objectMapper.writeValue(response.getWriter(), errorResponse);
-        };
+        log.info("Session auto-configuration: Registering InvalidSessionHandler");
+        return new InvalidSessionHandler(objectMapper);
     }
 }

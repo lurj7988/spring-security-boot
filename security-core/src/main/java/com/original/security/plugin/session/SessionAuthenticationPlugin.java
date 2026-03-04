@@ -1,5 +1,6 @@
 package com.original.security.plugin.session;
 
+import com.original.security.config.SessionProperties;
 import com.original.security.core.authentication.AuthenticationProvider;
 import com.original.security.plugin.AuthenticationPlugin;
 import org.slf4j.Logger;
