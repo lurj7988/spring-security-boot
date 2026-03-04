@@ -68,7 +68,7 @@ public class RoleServiceImpl implements RoleService {
 
         SecurityProperties.Cache cacheConfig = securityProperties.getCache();
         this.roleCache = Caffeine.newBuilder()
-                .maximumSize(cacheConfig.getMaxPoolSize())
+                .maximumSize(cacheConfig.getMaximumSize())
                 .expireAfterWrite(cacheConfig.getTtlMinutes(), java.util.concurrent.TimeUnit.MINUTES)
                 .build();
     }
@@ -81,7 +81,7 @@ public class RoleServiceImpl implements RoleService {
         }
 
         Set<String> userRoles = getOrLoadRoles(username);
-        return userRoles != null && matchesRole(userRoles, role);
+        return matchesRole(userRoles, role);
     }
 
     private Set<String> getOrLoadRoles(String username) {

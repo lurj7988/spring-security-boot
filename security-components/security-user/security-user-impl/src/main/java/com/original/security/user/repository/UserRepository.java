@@ -38,4 +38,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * @return true 如果存在，false 如果不存在
      */
     boolean existsByUsername(String username);
+
+    /**
+     * 根据角色名称查找用户 (用于缓存精确失效)
+     *
+     * @param roleName 角色名称
+     * @return 关联该角色的用户列表
+     */
+    java.util.List<User> findByRoles_Name(String roleName);
 }

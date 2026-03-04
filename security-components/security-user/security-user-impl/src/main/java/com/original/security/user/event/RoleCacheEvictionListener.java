@@ -24,24 +24,38 @@ public class RoleCacheEvictionListener {
 
     private final RoleService roleService;
     private final PermissionService permissionService;
+    private final com.original.security.user.repository.UserRepository userRepository;
 
-    public RoleCacheEvictionListener(RoleService roleService, PermissionService permissionService) {
+    public RoleCacheEvictionListener(RoleService roleService,
+                                     PermissionService permissionService,
+                                     com.original.security.user.repository.UserRepository userRepository) {
         this.roleService = roleService;
         this.permissionService = permissionService;
+        this.userRepository = userRepository;
     }
 
     /**
-     * 事务提交后清理角色缓存。
+     * 事务提交后清理受影响用户的权限/角色缓存。
      *
-     * <p>使用 {@code AFTER_COMMIT} 确保缓存清理发生在数据库变更持久化之后，
-     * 避免其他线程在事务提交前读到旧数据并写回缓存。
+     * <p>不再调用 clearAllCache() 以避免 Thunder Herd 效益。
+     * 只查找并清理属于该角色的特定用户的缓存。
      *
      * @param event 角色权限分配事件
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPermissionAssigned(RolePermissionAssignedEvent event) {
-        log.debug("Evicting role and permission caches after permission assignment for role: {}", event.getRoleName());
-        roleService.clearAllCache();
-        permissionService.clearAllCache();
+        String roleName = event.getRoleName();
+        log.debug("Finding users affected by role: {} for granular cache eviction", roleName);
+        
+        java.util.List<com.original.security.user.entity.User> affectedUsers = userRepository.findByRoles_Name(roleName);
+        
+        for (com.original.security.user.entity.User user : affectedUsers) {
+            String username = user.getUsername();
+            log.trace("Evicting cache for user: {}", username);
+            roleService.clearCache(username);
+            permissionService.clearCache(username);
+        }
+        
+        log.debug("Granular eviction complete. {} users affected.", affectedUsers.size());
     }
 }

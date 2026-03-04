@@ -37,7 +37,7 @@ public class PermissionServiceImpl implements PermissionService {
         
         SecurityProperties.Cache cacheConfig = securityProperties.getCache();
         this.permissionCache = Caffeine.newBuilder()
-                .maximumSize(cacheConfig.getMaxPoolSize())
+                .maximumSize(cacheConfig.getMaximumSize())
                 .expireAfterWrite(cacheConfig.getTtlMinutes(), java.util.concurrent.TimeUnit.MINUTES)
                 .build();
     }
@@ -50,7 +50,7 @@ public class PermissionServiceImpl implements PermissionService {
         }
 
         Set<String> userPermissions = getOrLoadPermissions(username);
-        return userPermissions != null && userPermissions.contains(permission);
+        return userPermissions.contains(permission);
     }
 
     private Set<String> getOrLoadPermissions(String username) {
