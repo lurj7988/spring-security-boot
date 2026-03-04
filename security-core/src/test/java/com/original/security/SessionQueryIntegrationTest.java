@@ -1,17 +1,20 @@
 package com.original.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.original.security.config.SecurityAutoConfiguration;
-import com.original.security.config.SessionAutoConfiguration;
-import com.original.security.config.NetworkSecurityAutoConfiguration;
-import com.original.security.config.CorsProperties;
+import com.original.security.config.*;
 import com.original.security.controller.SessionController;
+import com.original.security.handler.FrameAccessDeniedHandler;
+import com.original.security.handler.FrameAuthenticationEntryPoint;
 import com.original.security.util.JwtUtils;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.http.HttpMessageConvertersAutoConfiguration;
+import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -75,9 +78,9 @@ public class SessionQueryIntegrationTest {
 
     @Configuration
     @Import({
-            org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration.class,
-            org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration.class,
-            org.springframework.boot.autoconfigure.http.HttpMessageConvertersAutoConfiguration.class,
+            WebMvcAutoConfiguration.class,
+            JacksonAutoConfiguration.class,
+            HttpMessageConvertersAutoConfiguration.class,
             org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
             NetworkSecurityAutoConfiguration.class,
             SessionAutoConfiguration.class,
@@ -87,18 +90,19 @@ public class SessionQueryIntegrationTest {
     static class TestAppConfig {
 
         @Bean
-        public com.original.security.handler.FrameAuthenticationEntryPoint authenticationEntryPoint(ObjectMapper objectMapper) {
-            return new com.original.security.handler.FrameAuthenticationEntryPoint(objectMapper);
+        public FrameAuthenticationEntryPoint authenticationEntryPoint(ObjectMapper objectMapper) {
+            return new FrameAuthenticationEntryPoint(objectMapper);
         }
 
         @Bean
-        public com.original.security.handler.FrameAccessDeniedHandler accessDeniedHandler(ObjectMapper objectMapper, org.springframework.context.ApplicationEventPublisher publisher) {
-            return new com.original.security.handler.FrameAccessDeniedHandler(objectMapper, publisher);
+        public FrameAccessDeniedHandler accessDeniedHandler(ObjectMapper objectMapper, ApplicationEventPublisher publisher) {
+            return new FrameAccessDeniedHandler(objectMapper, publisher);
         }
 
         @Bean
-        public org.springframework.context.ApplicationEventPublisher applicationEventPublisher() {
-            return mock(org.springframework.context.ApplicationEventPublisher.class);
+        @org.springframework.context.annotation.Primary
+        public ApplicationEventPublisher applicationEventPublisher() {
+            return mock(ApplicationEventPublisher.class);
         }
 
         @Bean
@@ -109,8 +113,8 @@ public class SessionQueryIntegrationTest {
         }
 
         @Bean
-        public com.original.security.config.CsrfProperties csrfProperties() {
-            com.original.security.config.CsrfProperties p = new com.original.security.config.CsrfProperties();
+        public CsrfProperties csrfProperties() {
+            CsrfProperties p = new CsrfProperties();
             p.setEnabled(false);
             return p;
         }

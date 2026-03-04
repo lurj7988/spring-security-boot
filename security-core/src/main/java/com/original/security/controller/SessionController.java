@@ -3,6 +3,8 @@ package com.original.security.controller;
 import com.original.security.core.Response;
 import com.original.security.dto.PageResult;
 import com.original.security.dto.SessionInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -36,6 +38,12 @@ import java.util.stream.Collectors;
 @ConditionalOnProperty(prefix = "security.endpoints", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class SessionController {
 
+    private static final Logger log = LoggerFactory.getLogger(SessionController.class);
+    private static final String WARN_SESSION_REGISTRY_UNAVAILABLE = "SessionRegistry not available, returning empty session list";
+    private static final String WARN_NO_AUTHENTICATION = "No authentication found, returning empty session list";
+    private static final int MAX_PAGE_SIZE = 1000;
+    private static final int DEFAULT_PAGE_SIZE = 10;
+
     private final ObjectProvider<SessionRegistry> sessionRegistryProvider;
 
     public SessionController(ObjectProvider<SessionRegistry> sessionRegistryProvider) {
@@ -54,14 +62,33 @@ public class SessionController {
     public Response<PageResult<SessionInfo>> getAllSessions(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
-        
+
+        long startTime = System.currentTimeMillis();
+
+        // Validate pagination inputs and log corrections
+        int originalPage = page;
+        int originalSize = size;
+        if (page < 1) {
+            page = 1;
+            log.warn("Invalid page parameter {} corrected to 1", originalPage);
+        }
+        if (size < 1) {
+            size = DEFAULT_PAGE_SIZE;
+            log.warn("Invalid size parameter {} corrected to {}", originalSize, DEFAULT_PAGE_SIZE);
+        }
+        if (size > MAX_PAGE_SIZE) {
+            size = MAX_PAGE_SIZE;
+            log.warn("Size parameter {} exceeds maximum, corrected to {}", originalSize, MAX_PAGE_SIZE);
+        }
+
         SessionRegistry sessionRegistry = sessionRegistryProvider.getIfAvailable();
         if (sessionRegistry == null) {
+            log.warn(WARN_SESSION_REGISTRY_UNAVAILABLE);
             return Response.successBuilder(new PageResult<SessionInfo>(page, size, 0, new ArrayList<>())).build();
         }
 
         List<SessionInfo> allSessions = new ArrayList<>();
-        
+
         // 获取所有 principal（通常是 UserDetails 实例或 username 字符串）
         List<Object> principals = sessionRegistry.getAllPrincipals();
         for (Object principal : principals) {
@@ -76,6 +103,7 @@ public class SessionController {
         allSessions.sort(Comparator.comparing(SessionInfo::getLastActiveTime).reversed());
 
         // 内存分页
+        // 注意：对于大量会话场景，建议实现数据库级分页或使用缓存优化
         int total = allSessions.size();
         int startIndex = (page - 1) * size;
         List<SessionInfo> pagedList = new ArrayList<>();
@@ -85,6 +113,10 @@ public class SessionController {
         }
 
         PageResult<SessionInfo> result = new PageResult<>(page, size, total, pagedList);
+        long duration = System.currentTimeMillis() - startTime;
+        log.info("Query all sessions completed: total={}, page={}, size={}, returned={}, duration={}ms",
+                total, page, size, pagedList.size(), duration);
+
         return Response.successBuilder(result).build();
     }
 
@@ -95,24 +127,32 @@ public class SessionController {
      */
     @GetMapping("/me")
     public Response<List<SessionInfo>> getMySessions() {
+        long startTime = System.currentTimeMillis();
+
         SessionRegistry sessionRegistry = sessionRegistryProvider.getIfAvailable();
         if (sessionRegistry == null) {
+            log.warn(WARN_SESSION_REGISTRY_UNAVAILABLE);
             return Response.successBuilder((List<SessionInfo>) new ArrayList<SessionInfo>()).build();
         }
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getPrincipal() == null) {
+            log.warn(WARN_NO_AUTHENTICATION);
             return Response.successBuilder((List<SessionInfo>) new ArrayList<SessionInfo>()).build();
         }
 
         Object principal = authentication.getPrincipal();
         List<SessionInformation> sessions = sessionRegistry.getAllSessions(principal, false);
-        
+
         String username = extractUsername(principal);
         List<SessionInfo> sessionInfos = sessions.stream()
                 .map(s -> mapToSessionInfo(s, username))
                 .sorted(Comparator.comparing(SessionInfo::getLastActiveTime).reversed())
                 .collect(Collectors.toList());
+
+        long duration = System.currentTimeMillis() - startTime;
+        log.info("Query my sessions completed: username={}, sessions={}, duration={}ms",
+                username, sessionInfos.size(), duration);
 
         return Response.successBuilder(sessionInfos).build();
     }
@@ -128,13 +168,21 @@ public class SessionController {
         SessionInfo info = new SessionInfo();
         info.setSessionId(session.getSessionId());
         info.setUsername(username);
-        // Spring Security SessionInformation 不直接提供创建时间，
-        // 这里为了演示，我们假设 loginTime 即为会话最后一次访问时间或如果实现允许可扩展记录。
-        // 由于无法获取准确的 loginTime，这里暂时将 loginTime 和 lastActiveTime 置为相同，或根据需求留空。
-        info.setLoginTime(session.getLastRequest()); 
+
+        // 注意：Spring Security 标准的 SessionInformation 不直接提供会话创建时间（loginTime）
+        // 由于无法获取准确的登录时间，这里将 loginTime 和 lastActiveTime 都设置为最后请求时间
+        // 这是 Spring Security 的限制，如需区分登录时间和最后活跃时间，需要：
+        // 1. 扩展 SessionRegistry 实现记录创建时间
+        // 2. 或在会话创建时在应用层记录额外元数据
+        info.setLoginTime(session.getLastRequest());
         info.setLastActiveTime(session.getLastRequest());
-        // SessionRegistry 默认不记录 IP。如有需要，可通过自定义的 SessionRegistry 实现。
+
+        // 注意：SessionRegistry 默认不记录 IP 地址
+        // 如需获取真实 IP 地址，需要：
+        // 1. 扩展 SessionRegistry 实现在会话创建时记录请求 IP
+        // 2. 或维护一个独立的 sessionId -> IP 地址映射表
         info.setIpAddress("unknown");
+
         return info;
     }
 }

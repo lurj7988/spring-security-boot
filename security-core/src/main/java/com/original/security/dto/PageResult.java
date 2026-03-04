@@ -5,8 +5,8 @@ import java.util.List;
 /**
  * 分页结果封装类。
  *
- * @param <T> 数据类型
- * @author bmad
+ * @param <T> 泛型类型参数
+ * @author Naulu
  * @since 0.1.0
  */
 public class PageResult<T> {

@@ -8,31 +8,31 @@ import java.util.Date;
  * 用于封装用户的会话详情，包含会话 ID、用户名、登录时间、最后活跃时间以及 IP 地址等。
  * </p>
  *
- * @author bmad
+ * @author Naulu
  * @since 0.1.0
  */
 public class SessionInfo {
-    
+
     /**
      * 会话 ID
      */
     private String sessionId;
-    
+
     /**
      * 用户名
      */
     private String username;
-    
+
     /**
      * 登录时间（或创建时间）
      */
     private Date loginTime;
-    
+
     /**
      * 最后活跃时间
      */
     private Date lastActiveTime;
-    
+
     /**
      * IP 地址（如果有）
      */

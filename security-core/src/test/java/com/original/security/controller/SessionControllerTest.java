@@ -14,9 +14,7 @@ import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -33,6 +31,7 @@ class SessionControllerTest {
     @SuppressWarnings("unchecked")
     void setUp() {
         sessionRegistry = mock(SessionRegistry.class);
+        //noinspection unchecked
         ObjectProvider<SessionRegistry> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(sessionRegistry);
 
@@ -52,7 +51,7 @@ class SessionControllerTest {
 
         when(sessionRegistry.getAllPrincipals()).thenReturn(Arrays.asList(user1, user2));
         when(sessionRegistry.getAllSessions(eq(user1), anyBoolean())).thenReturn(Arrays.asList(session1, session3));
-        when(sessionRegistry.getAllSessions(eq(user2), anyBoolean())).thenReturn(Arrays.asList(session2));
+        when(sessionRegistry.getAllSessions(eq(user2), anyBoolean())).thenReturn(Collections.singletonList(session2));
 
         // Test page 1, size 2
         Response<PageResult<SessionInfo>> response = sessionController.getAllSessions(1, 2);
@@ -87,7 +86,7 @@ class SessionControllerTest {
 
         Date now = new Date();
         SessionInformation session1 = new SessionInformation(user, "my-session-1", now);
-        when(sessionRegistry.getAllSessions(eq(user), anyBoolean())).thenReturn(Arrays.asList(session1));
+        when(sessionRegistry.getAllSessions(eq(user), anyBoolean())).thenReturn(Collections.singletonList(session1));
 
         Response<List<SessionInfo>> response = sessionController.getMySessions();
         assertEquals(200, response.getCode());
@@ -97,5 +96,113 @@ class SessionControllerTest {
         assertEquals("me", result.get(0).getUsername());
 
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void testGetAllSessions_WithInvalidPage_Zero_CorrectedToOne() {
+        UserDetails user = User.withUsername("test").password("").authorities("USER").build();
+        when(sessionRegistry.getAllPrincipals()).thenReturn(Collections.singletonList(user));
+        when(sessionRegistry.getAllSessions(eq(user), anyBoolean())).thenReturn(new ArrayList<>());
+
+        Response<PageResult<SessionInfo>> response = sessionController.getAllSessions(0, 10);
+        assertEquals(200, response.getCode());
+        PageResult<SessionInfo> result = response.getBody();
+        assertEquals(1, result.getPage()); // Corrected to 1
+        assertEquals(10, result.getSize());
+    }
+
+    @Test
+    void testGetAllSessions_WithInvalidPage_Negative_CorrectedToOne() {
+        UserDetails user = User.withUsername("test").password("").authorities("USER").build();
+        when(sessionRegistry.getAllPrincipals()).thenReturn(Collections.singletonList(user));
+        when(sessionRegistry.getAllSessions(eq(user), anyBoolean())).thenReturn(new ArrayList<>());
+
+        Response<PageResult<SessionInfo>> response = sessionController.getAllSessions(-1, 10);
+        assertEquals(200, response.getCode());
+        PageResult<SessionInfo> result = response.getBody();
+        assertEquals(1, result.getPage()); // Corrected to 1
+        assertEquals(10, result.getSize());
+    }
+
+    @Test
+    void testGetAllSessions_WithInvalidSize_Zero_CorrectedToTen() {
+        UserDetails user = User.withUsername("test").password("").authorities("USER").build();
+        when(sessionRegistry.getAllPrincipals()).thenReturn(Collections.singletonList(user));
+        when(sessionRegistry.getAllSessions(eq(user), anyBoolean())).thenReturn(new ArrayList<>());
+
+        Response<PageResult<SessionInfo>> response = sessionController.getAllSessions(1, 0);
+        assertEquals(200, response.getCode());
+        PageResult<SessionInfo> result = response.getBody();
+        assertEquals(1, result.getPage());
+        assertEquals(10, result.getSize()); // Corrected to 10
+    }
+
+    @Test
+    void testGetAllSessions_WithInvalidSize_ExceedsMaximum_CorrectedToThousand() {
+        UserDetails user = User.withUsername("test").password("").authorities("USER").build();
+        when(sessionRegistry.getAllPrincipals()).thenReturn(Collections.singletonList(user));
+        when(sessionRegistry.getAllSessions(eq(user), anyBoolean())).thenReturn(new ArrayList<>());
+
+        Response<PageResult<SessionInfo>> response = sessionController.getAllSessions(1, 2000);
+        assertEquals(200, response.getCode());
+        PageResult<SessionInfo> result = response.getBody();
+        assertEquals(1, result.getPage());
+        assertEquals(1000, result.getSize()); // Corrected to 1000
+    }
+
+    @Test
+    void testGetAllSessions_WithPageBeyondData_ReturnsEmptyList() {
+        UserDetails user = User.withUsername("test").password("").authorities("USER").build();
+        when(sessionRegistry.getAllPrincipals()).thenReturn(Collections.singletonList(user));
+        when(sessionRegistry.getAllSessions(eq(user), anyBoolean())).thenReturn(new ArrayList<>());
+
+        Response<PageResult<SessionInfo>> response = sessionController.getAllSessions(999, 10);
+        assertEquals(200, response.getCode());
+        PageResult<SessionInfo> result = response.getBody();
+        assertEquals(999, result.getPage());
+        assertEquals(10, result.getSize());
+        assertEquals(0, result.getTotal());
+        assertTrue(result.getList().isEmpty());
+    }
+
+    @Test
+    void testGetAllSessions_WithoutSessionRegistry_ReturnsEmptyResult() {
+        //noinspection unchecked
+        ObjectProvider<SessionRegistry> emptyProvider = mock(ObjectProvider.class);
+        when(emptyProvider.getIfAvailable()).thenReturn(null);
+
+        SessionController controllerWithoutRegistry = new SessionController(emptyProvider);
+
+        Response<PageResult<SessionInfo>> response = controllerWithoutRegistry.getAllSessions(1, 10);
+        assertEquals(200, response.getCode());
+        PageResult<SessionInfo> result = response.getBody();
+        assertEquals(1, result.getPage());
+        assertEquals(10, result.getSize());
+        assertEquals(0, result.getTotal());
+        assertTrue(result.getList().isEmpty());
+    }
+
+    @Test
+    void testGetMySessions_WithoutSessionRegistry_ReturnsEmptyList() {
+        //noinspection unchecked
+        ObjectProvider<SessionRegistry> emptyProvider = mock(ObjectProvider.class);
+        when(emptyProvider.getIfAvailable()).thenReturn(null);
+
+        SessionController controllerWithoutRegistry = new SessionController(emptyProvider);
+
+        Response<List<SessionInfo>> response = controllerWithoutRegistry.getMySessions();
+        assertEquals(200, response.getCode());
+        List<SessionInfo> result = response.getBody();
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void testGetMySessions_WithoutAuthentication_ReturnsEmptyList() {
+        SecurityContextHolder.clearContext();
+
+        Response<List<SessionInfo>> response = sessionController.getMySessions();
+        assertEquals(200, response.getCode());
+        List<SessionInfo> result = response.getBody();
+        assertTrue(result.isEmpty());
     }
 }
