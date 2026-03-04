@@ -97,9 +97,11 @@ Gemini 2.5 Pro
 - Added `Caffeine` dependency to `security-user-impl`.
 - Updated `RoleCacheEvictionListener` to evict caches in BOTH `RoleService` and `PermissionService` upon permission assignment.
 - Successfully created a multithreaded performance test `PermissionServicePerformanceTest` which verifies concurrent access latency is well under 5ms.
-- **AI Review Fixes**: Moved hardcoded `MAX_CACHE_SIZE` and `TTL` parameters to `SecurityProperties` in `security-core`.
+- **AI Review Fixes**: Moved hardcoded `MAX_CACHE_SIZE` and `TTL` parameters to `SecurityProperties` in `security-core` and renamed `maxPoolSize` to `maximumSize` for clarity.
 - **AI Review Fixes**: Synchronized all modified files into the File List for better traceability.
-- All unit tests passing, compilation successful.
+- **AI Review Fixes (Antigravity)**: Implemented granular cache invalidation in `RoleCacheEvictionListener` (findByRoles_Name) to prevent "Thunder Herd" database spikes on permission updates.
+- **AI Review Fixes (Antigravity)**: Removed redundant null checks in service implementations.
+- All unit tests passing (including performance tests), compilation successful.
 
 ### File List
 

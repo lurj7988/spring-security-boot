@@ -43,7 +43,7 @@ So that 我的用户可以通过会话保持登录状态。
   - [x] Subtask 1.4: 实现 `supports(Class<?> authenticationType)` 支持 `UsernamePasswordAuthenticationToken`
 
 - [x] Task 2: 实现 Session 认证配置 (AC: 2)
-  - [x] Subtask 2.1: 在 `SecurityProperties` 中添加 `session.*` 配置项（timeout, store-type, cookie-name）
+  - [x] Subtask 2.1: 创建独立的 `SessionProperties` 配置类管理 `session.*` 配置项（timeout, store-type, cookie-name, fixation-protection）
   - [x] Subtask 2.2: 创建 `SessionProperties` 配置类使用 `@ConfigurationProperties`
   - [x] Subtask 2.3: 配置默认过期时间为 30 分钟（1800秒）
   - [x] Subtask 2.4: 支持配置存储方式（memory/redis），默认为内存
@@ -63,7 +63,7 @@ So that 我的用户可以通过会话保持登录状态。
   - [x] Subtask 5.1: 编写 `SessionAuthenticationPluginTest` 测试插件注册和基本功能
   - [x] Subtask 5.2: 编写 `SessionPropertiesTest` 测试配置加载
   - [x] Subtask 5.3: 编写 `SessionExpiredHandlerTest` 测试 Session 过期处理
-  - [x] Subtask 5.4: 所有测试通过（28 个测试用例）
+  - [x] Subtask 5.4: 所有测试通过（34 个测试用例）
 
 ## Dev Notes
 
@@ -109,11 +109,24 @@ protected void configure(HttpSecurity http) throws Exception {
 ### 配置属性参考
 
 ```properties
-# Session 配置项（需要添加到 SecurityProperties）
-security.session.timeout=1800           # Session 超时时间（秒），默认 30 分钟
-security.session.max-sessions=1         # 单用户最大 Session 数，默认 1
-security.session.store-type=memory      # 存储方式：memory/redis，默认 memory
-security.session.cookie-name=JSESSIONID # Cookie 名称
+# Session 配置项（需要添加到 application.properties）
+# 必须显式启用 Session 功能，否则默认使用 STATELESS 模式
+security.session.enabled=true
+
+# Session 超时时间（秒），默认 30 分钟
+security.session.timeout=1800
+
+# 单用户最大 Session 数，默认 1
+security.session.max-sessions=1
+
+# 存储方式：memory/redis，默认 memory
+security.session.store-type=memory
+
+# Cookie 名称，默认 JSESSIONID
+security.session.cookie-name=JSESSIONID
+
+# 是否启用 Session 固定攻击防护，默认 true
+security.session.fixation-protection=true
 ```
 
 ### Previous Story Intelligence
@@ -176,11 +189,23 @@ Claude Opus 4.6 (claude-opus-4-6)
 
 1. **SessionAuthenticationPlugin**: 实现了 `AuthenticationPlugin` 接口，提供 Session 认证插件功能
 2. **SessionProperties**: 创建了独立的配置属性类，支持 timeout、maxSessions、storeType、fixationProtection 配置
-3. **SecurityProperties**: 扩展添加了 `Session` 内部类，保持向后兼容
+3. **SessionProperties**: 独立配置类管理所有 Session 配置（未修改 SecurityProperties）
 4. **SessionAutoConfiguration**: 配置 SessionRegistry、HttpSessionEventPublisher、SessionInformationExpiredStrategy、InvalidSessionStrategy
 5. **SessionExpiredHandler**: 实现 `SessionInformationExpiredStrategy` 接口，返回 401 JSON 响应
 6. **SecurityAutoConfiguration**: 修改 Session 策略从 `STATELESS` 改为 `IF_REQUIRED`
-7. **单元测试和集成测试**: 28 个测试用例全部通过，新增 SessionAuthenticationIntegrationTest 验证完整认证流程。
+7. **单元测试和集成测试**: 34 个测试用例全部通过，新增 SessionAuthenticationIntegrationTest 验证完整认证流程。
+
+**AI Review Fixes (Code Review - 2nd Round)**:
+- 修复并发 Session 控制配置：添加 `maxSessionsPreventsLogin(false)` 允许新登录踢出旧 Session
+- 增强 SessionProperties 验证：为 `setMaxSessions` 添加验证，确保值大于 0 或等于 -1
+- 增强 SessionProperties 验证：为 `setStoreType` 添加验证，只允许 "memory" 或 "redis"
+- 新增验证测试：为 `setMaxSessions` 和 `setStoreType` 添加 4 个新的测试用例
+- 更新文档：说明 `cookieName` 配置为未来功能预留接口
+
+**AI Review Fixes (Code Review - 3rd Round)**:
+- 修复无效配置问题：将 `enabled` 字段添加到 `SessionProperties`，使得 `security.session.enabled=true` 可以被正确绑定
+- 新增 enabled 字段测试：添加 `testIsEnabled_DefaultValue_ReturnsTrue` 和 `testSetEnabled_UpdatesValue`
+- 更新文档：在配置示例中添加 `security.session.enabled=true` 说明
 
 ### File List
 
@@ -190,6 +215,7 @@ Claude Opus 4.6 (claude-opus-4-6)
 - `security-core/src/main/java/com/original/security/config/SessionProperties.java`
 - `security-core/src/main/java/com/original/security/config/SessionAutoConfiguration.java`
 - `security-core/src/main/java/com/original/security/handler/SessionExpiredHandler.java`
+- `security-core/src/main/java/com/original/security/handler/InvalidSessionHandler.java`
 - `security-core/src/test/java/com/original/security/plugin/session/SessionAuthenticationPluginTest.java`
 - `security-core/src/test/java/com/original/security/config/SessionPropertiesTest.java`
 - `security-core/src/test/java/com/original/security/handler/SessionExpiredHandlerTest.java`
@@ -197,5 +223,5 @@ Claude Opus 4.6 (claude-opus-4-6)
 
 **修改文件:**
 
-- `security-core/src/main/java/com/original/security/config/SecurityProperties.java` - 添加 Session 内部类
-- `security-core/src/main/java/com/original/security/config/SecurityAutoConfiguration.java` - 修改 SessionCreationPolicy
+- `security-core/src/main/java/com/original/security/config/SecurityAutoConfiguration.java` - 修改 SessionCreationPolicy 为 IF_REQUIRED，添加 Session 管理配置，修复并发 Session 控制
+- `security-core/src/main/java/com/original/security/config/SessionProperties.java` - 添加输入验证，更新文档
