@@ -12,6 +12,7 @@ import org.springframework.security.core.session.SessionInformation;
 import org.springframework.security.web.session.SessionInformationExpiredEvent;
 
 import java.util.Date;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -71,7 +72,7 @@ class SessionExpiredHandlerTest {
         handler.onExpiredSessionDetected(event);
 
         // Then
-        assertTrue(response.getContentType().startsWith(MediaType.APPLICATION_JSON_VALUE),
+        assertTrue(Objects.requireNonNull(response.getContentType()).startsWith(MediaType.APPLICATION_JSON_VALUE),
                 "Content-Type should start with application/json");
         assertTrue(response.getContentType().contains("charset=UTF-8"),
                 "Content-Type should contain charset=UTF-8");

@@ -5,12 +5,9 @@ import com.original.security.config.SessionAutoConfiguration;
 import com.original.security.config.SecurityAutoConfiguration;
 import com.original.security.config.NetworkSecurityAutoConfiguration;
 import com.original.security.config.CorsProperties;
-import com.original.security.config.CsrfProperties;
-import com.original.security.dto.LoginRequest;
 import com.original.security.util.JwtUtils;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,12 +15,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpSession;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,9 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.servlet.http.Cookie;
 import java.util.Collections;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -55,9 +47,6 @@ public class SessionAuthenticationIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
 
     @Test
     @DisplayName("AccessProtectedResource_WithoutSession_Returns401")
@@ -91,20 +80,16 @@ public class SessionAuthenticationIntegrationTest {
     }
 
     @Test
-    @DisplayName("ConcurrentSessionControl_MaxOneSession_PreventsConcurrentAccess")
-    void testConcurrentSessionControl_MaxOneSession_PreventsConcurrentAccess() throws Exception {
-        Authentication auth = new UsernamePasswordAuthenticationToken("user", "pass", 
+    @DisplayName("SessionConfiguration_WithMaxSessionsSet_AllowsAuthenticatedAccess")
+    void testSessionConfiguration_WithMaxSessionsSet_AllowsAuthenticatedAccess() throws Exception {
+        Authentication auth = new UsernamePasswordAuthenticationToken("user", "pass",
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
 
-        // First session
+        // Verify session management configuration is active and does not block normal access
         mockMvc.perform(get("/api/test/secure")
                 .with(authentication(auth))
                 .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
-
-        // Note: Real concurrent control testing with MockMvc is limited as it doesn't 
-        // fully simulate the SessionRegistry lifecycle across multiple requests 
-        // without a real servlet container, but we verify the configuration is active.
     }
 
     @Test

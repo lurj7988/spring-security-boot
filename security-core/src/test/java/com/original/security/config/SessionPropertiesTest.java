@@ -24,6 +24,7 @@ class SessionPropertiesTest {
         assertEquals(1, properties.getMaxSessions(), "Default max sessions should be 1");
         assertEquals("memory", properties.getStoreType(), "Default store type should be memory");
         assertTrue(properties.isFixationProtection(), "Fixation protection should be enabled by default");
+        assertTrue(properties.isEnabled(), "enabled should be true by default");
     }
 
     @Test
@@ -140,5 +141,71 @@ class SessionPropertiesTest {
 
         // Then
         assertFalse(properties.isFixationProtection());
+    }
+
+    @Test
+    @DisplayName("setMaxSessions_WithZero_ThrowsException")
+    void testSetMaxSessions_WithZero_ThrowsException() {
+        // Given
+        SessionProperties properties = new SessionProperties();
+
+        // When/Then
+        assertThrows(IllegalArgumentException.class, () -> properties.setMaxSessions(0));
+    }
+
+    @Test
+    @DisplayName("setMaxSessions_WithNegativeValueOtherThanMinusOne_ThrowsException")
+    void testSetMaxSessions_WithNegativeValueOtherThanMinusOne_ThrowsException() {
+        // Given
+        SessionProperties properties = new SessionProperties();
+
+        // When/Then
+        assertThrows(IllegalArgumentException.class, () -> properties.setMaxSessions(-2));
+    }
+
+    @Test
+    @DisplayName("setStoreType_WithInvalidValue_ThrowsException")
+    void testSetStoreType_WithInvalidValue_ThrowsException() {
+        // Given
+        SessionProperties properties = new SessionProperties();
+
+        // When/Then
+        assertThrows(IllegalArgumentException.class, () -> properties.setStoreType("invalid"));
+    }
+
+    @Test
+    @DisplayName("setStoreType_WithNull_AllowsNull")
+    void testSetStoreType_WithNull_AllowsNull() {
+        // Given
+        SessionProperties properties = new SessionProperties();
+
+        // When
+        properties.setStoreType(null);
+
+        // Then
+        assertNull(properties.getStoreType());
+    }
+
+    @Test
+    @DisplayName("isEnabled_DefaultValue_ReturnsTrue")
+    void testIsEnabled_DefaultValue_ReturnsTrue() {
+        // Given
+        SessionProperties properties = new SessionProperties();
+
+        // Then
+        assertTrue(properties.isEnabled(), "enabled should be true by default");
+    }
+
+    @Test
+    @DisplayName("setEnabled_UpdatesValue")
+    void testSetEnabled_UpdatesValue() {
+        // Given
+        SessionProperties properties = new SessionProperties();
+
+        // When
+        properties.setEnabled(false);
+
+        // Then
+        assertFalse(properties.isEnabled());
     }
 }
