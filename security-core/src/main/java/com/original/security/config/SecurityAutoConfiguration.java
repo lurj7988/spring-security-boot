@@ -44,7 +44,7 @@ import java.util.stream.Collectors;
  */
 @Configuration
 @EnableWebSecurity
-@Import({NetworkSecurityAutoConfiguration.class, MethodSecurityConfiguration.class})
+@Import({NetworkSecurityAutoConfiguration.class, MethodSecurityConfiguration.class, RememberMeAutoConfiguration.class})
 public class SecurityAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityAutoConfiguration.class);
@@ -127,7 +127,11 @@ public class SecurityAutoConfiguration {
             ObjectProvider<SessionProperties> sessionPropertiesProvider,
             ObjectProvider<SessionRegistry> sessionRegistryProvider,
             ObjectProvider<SessionInformationExpiredStrategy> sessionExpiredStrategyProvider,
-            ObjectProvider<InvalidSessionStrategy> invalidSessionStrategyProvider
+            ObjectProvider<InvalidSessionStrategy> invalidSessionStrategyProvider,
+            ObjectProvider<RememberMeProperties> rememberMePropertiesProvider,
+            ObjectProvider<org.springframework.security.core.userdetails.UserDetailsService> userDetailsServiceProvider,
+            ObjectProvider<org.springframework.security.web.authentication.rememberme.PersistentTokenRepository> persistentTokenRepositoryProvider,
+            ObjectProvider<org.springframework.security.web.authentication.RememberMeServices> rememberMeServicesProvider
     ) throws Exception {
         log.info("Security auto-configuration: Initializing basic SecurityFilterChain");
         
@@ -232,6 +236,39 @@ public class SecurityAutoConfiguration {
             log.info("Security auto-configuration: Using default stateless session policy");
             http.sessionManagement()
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+        }
+
+        RememberMeProperties rememberMeProperties = rememberMePropertiesProvider.getIfAvailable();
+        if (rememberMeProperties != null && rememberMeProperties.isEnabled()) {
+            org.springframework.security.web.authentication.RememberMeServices rememberMeServices = rememberMeServicesProvider.getIfAvailable();
+
+            if (rememberMeServices != null) {
+                log.info("Security auto-configuration: Configuring stateful Remember Me with custom RememberMeServices");
+                http.rememberMe().rememberMeServices(rememberMeServices);
+            } else {
+                org.springframework.security.core.userdetails.UserDetailsService userDetailsService = userDetailsServiceProvider.getIfAvailable();
+                org.springframework.security.web.authentication.rememberme.PersistentTokenRepository persistentTokenRepository = persistentTokenRepositoryProvider.getIfAvailable();
+                
+                if (userDetailsService != null && persistentTokenRepository != null) {
+                    log.info("Security auto-configuration: Configuring stateful Remember Me");
+                    http.rememberMe()
+                        .tokenRepository(persistentTokenRepository)
+                        .userDetailsService(userDetailsService)
+                        .tokenValiditySeconds(rememberMeProperties.getTokenValiditySeconds())
+                        .rememberMeCookieName(rememberMeProperties.getCookieName());
+
+                    String key = rememberMeProperties.getKey();
+                    if (key == null || key.isEmpty()) {
+                        // 强制要求用户配置 Remember Me 密钥，避免每次重启生成新密钥导致 Cookie 失效
+                        log.error("RememberMeServices key is not configured. Please set 'security.remember-me.key' property with a secure key for production use.");
+                        throw new IllegalStateException("RememberMeServices key must be configured via 'security.remember-me.key' property. " +
+                                "For development, you may set it in application.properties or environment variables.");
+                    }
+                    http.rememberMe().key(key);
+                } else {
+                    log.warn("Security auto-configuration: Remember Me is enabled but UserDetailsService or PersistentTokenRepository is missing");
+                }
+            }
         }
 
         http

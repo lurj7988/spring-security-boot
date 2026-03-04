@@ -10,7 +10,6 @@ import io.jsonwebtoken.impl.DefaultClaims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -48,6 +47,7 @@ public class AuthenticationControllerTest {
     private AuthenticationManager authenticationManager;
     private ObjectProvider<JwtUtils> jwtUtilsProvider;
     private JwtUtils jwtUtils;
+    private ObjectProvider<org.springframework.security.web.authentication.RememberMeServices> rememberMeServicesProvider;
 
     /**
      * 测试设置：初始化 mock 对象和 MockMvc。
@@ -59,10 +59,12 @@ public class AuthenticationControllerTest {
         authenticationManager = mock(AuthenticationManager.class);
         jwtUtilsProvider = mock(ObjectProvider.class);
         jwtUtils = mock(JwtUtils.class);
+        rememberMeServicesProvider = mock(ObjectProvider.class);
 
         when(jwtUtilsProvider.getIfAvailable()).thenReturn(jwtUtils);
+        when(rememberMeServicesProvider.getIfAvailable()).thenReturn(null);
 
-        AuthenticationController controller = new AuthenticationController(authenticationManager, jwtUtilsProvider);
+        AuthenticationController controller = new AuthenticationController(authenticationManager, jwtUtilsProvider, rememberMeServicesProvider);
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -209,5 +211,68 @@ public class AuthenticationControllerTest {
                 .andExpect(jsonPath("$.data.user").value("admin"))
                 .andExpect(jsonPath("$.data.token").isEmpty())
                 .andExpect(jsonPath("$.data.jwtEnabled").value(false));
+    }
+
+    /**
+     * 测试登录时启用 Remember Me。
+     * 验证 RememberMeServices.loginSuccess() 被调用。
+     */
+    @Test
+    void testLogin_WithRememberMe_CallsRememberMeServices() throws Exception {
+        // 在 setUp 后设置 RememberMeServices
+        org.springframework.security.web.authentication.RememberMeServices rememberMeServices = mock(org.springframework.security.web.authentication.RememberMeServices.class);
+        when(rememberMeServicesProvider.getIfAvailable()).thenReturn(rememberMeServices);
+
+        LoginRequest request = new LoginRequest();
+        request.setUsername("admin");
+        request.setPassword("password");
+        request.setRememberMe(true);
+
+        Authentication auth = new UsernamePasswordAuthenticationToken("admin", "password", Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        when(authenticationManager.authenticate(any(Authentication.class))).thenReturn(auth);
+
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        // 验证 RememberMeServices.loginSuccess 被调用
+        org.mockito.Mockito.verify(rememberMeServices).loginSuccess(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(auth)
+        );
+    }
+
+    /**
+     * 测试登录时未启用 Remember Me。
+     * 验证 RememberMeServices.loginSuccess() 未被调用。
+     */
+    @Test
+    void testLogin_WithoutRememberMe_DoesNotCallRememberMeServices() throws Exception {
+        org.springframework.security.web.authentication.RememberMeServices rememberMeServices = mock(org.springframework.security.web.authentication.RememberMeServices.class);
+        when(rememberMeServicesProvider.getIfAvailable()).thenReturn(rememberMeServices);
+
+        LoginRequest request = new LoginRequest();
+        request.setUsername("admin");
+        request.setPassword("password");
+        request.setRememberMe(false);
+
+        Authentication auth = new UsernamePasswordAuthenticationToken("admin", "password", Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        when(authenticationManager.authenticate(any(Authentication.class))).thenReturn(auth);
+
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        // 验证 RememberMeServices.loginSuccess 未被调用
+        org.mockito.Mockito.verify(rememberMeServices, org.mockito.Mockito.never()).loginSuccess(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
     }
 }

@@ -26,6 +26,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.stream.Collectors;
 
+import org.springframework.security.web.authentication.RememberMeServices;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpServletRequestWrapper;
+
 /**
  * 默认认证控制器。
  * <p>
@@ -55,16 +59,19 @@ public class AuthenticationController {
 
     private final AuthenticationManager authenticationManager;
     private final ObjectProvider<JwtUtils> jwtUtilsProvider;
+    private final ObjectProvider<RememberMeServices> rememberMeServicesProvider;
 
     /**
      * 构造认证控制器。
      *
      * @param authenticationManager 认证管理器
      * @param jwtUtilsProvider JWT 工具类提供者（可选）
+     * @param rememberMeServicesProvider Remember Me 服务提供者（可选）
      */
-    public AuthenticationController(AuthenticationManager authenticationManager, ObjectProvider<JwtUtils> jwtUtilsProvider) {
+    public AuthenticationController(AuthenticationManager authenticationManager, ObjectProvider<JwtUtils> jwtUtilsProvider, ObjectProvider<RememberMeServices> rememberMeServicesProvider) {
         this.authenticationManager = authenticationManager;
         this.jwtUtilsProvider = jwtUtilsProvider;
+        this.rememberMeServicesProvider = rememberMeServicesProvider;
     }
 
     /**
@@ -74,10 +81,12 @@ public class AuthenticationController {
      * </p>
      *
      * @param loginRequest 登录请求，包含用户名和密码
+     * @param request HTTP 请求对象
+     * @param response HTTP 响应对象
      * @return 认证响应，包含用户信息和 Token（如果可用）
      */
     @PostMapping("/login")
-    public Response<AuthResponse> login(@RequestBody LoginRequest loginRequest) {
+    public Response<AuthResponse> login(@RequestBody LoginRequest loginRequest, HttpServletRequest request, HttpServletResponse response) {
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword())
@@ -86,6 +95,23 @@ public class AuthenticationController {
             // 在无状态 JWT 模式下，SecurityContext 设置的作用有限，
             // 但保留以兼容可能的 session 模式扩展
             SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            // 触发 Remember Me 成功处理
+            if (loginRequest.isRememberMe()) {
+                RememberMeServices rememberMeServices = rememberMeServicesProvider.getIfAvailable();
+                if (rememberMeServices != null) {
+                    HttpServletRequest wrapper = new HttpServletRequestWrapper(request) {
+                        @Override
+                        public String getParameter(String name) {
+                            if ("rememberMe".equals(name) || "remember-me".equals(name)) {
+                                return "true";
+                            }
+                            return super.getParameter(name);
+                        }
+                    };
+                    rememberMeServices.loginSuccess(wrapper, response, authentication);
+                }
+            }
 
             Object user = authentication.getPrincipal();
             String token = null;
@@ -103,6 +129,8 @@ public class AuthenticationController {
             AuthResponse authResponse = new AuthResponse(user, token, jwtEnabled);
             return Response.successBuilder(authResponse).build();
         } catch (AuthenticationException e) {
+            // 清除可能已存在的 SecurityContext
+            SecurityContextHolder.clearContext();
             // 不暴露具体异常信息，仅返回通用错误消息
             return Response.<AuthResponse>errorBuilder().msg(ERROR_MSG_AUTH_FAILED).build();
         } catch (Exception e) {
@@ -113,14 +141,22 @@ public class AuthenticationController {
     /**
      * 用户登出接口。
      * <p>
-     * 清除当前请求的安全上下文。
+     * 清除当前请求的安全上下文，并清除 Remember Me Cookie。
      * </p>
      *
      * @param request HTTP 请求对象
+     * @param response HTTP 响应对象
      * @return 登出响应
      */
     @PostMapping("/logout")
-    public Response<Void> logout(HttpServletRequest request) {
+    public Response<Void> logout(HttpServletRequest request, HttpServletResponse response) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null) {
+            RememberMeServices rememberMeServices = rememberMeServicesProvider.getIfAvailable();
+            if (rememberMeServices instanceof org.springframework.security.web.authentication.logout.LogoutHandler) {
+                ((org.springframework.security.web.authentication.logout.LogoutHandler) rememberMeServices).logout(request, response, authentication);
+            }
+        }
         SecurityContextHolder.clearContext();
         return Response.<Void>successBuilder(null).build();
     }

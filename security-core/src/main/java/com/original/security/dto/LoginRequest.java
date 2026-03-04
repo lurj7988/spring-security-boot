@@ -3,7 +3,7 @@ package com.original.security.dto;
 /**
  * 登录请求数据传输对象。
  * <p>
- * 包含用户名和密码字段，用于用户登录请求。
+ * 包含用户名、密码和记住我字段，用于用户登录请求。
  * </p>
  *
  * @author bmad
@@ -12,6 +12,7 @@ package com.original.security.dto;
 public class LoginRequest {
     private String username;
     private String password;
+    private boolean rememberMe;
 
     /**
      * 获取用户名。
@@ -47,5 +48,23 @@ public class LoginRequest {
      */
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    /**
+     * 获取是否记住我。
+     *
+     * @return 记住我
+     */
+    public boolean isRememberMe() {
+        return rememberMe;
+    }
+
+    /**
+     * 设置是否记住我。
+     *
+     * @param rememberMe 记住我
+     */
+    public void setRememberMe(boolean rememberMe) {
+        this.rememberMe = rememberMe;
     }
 }

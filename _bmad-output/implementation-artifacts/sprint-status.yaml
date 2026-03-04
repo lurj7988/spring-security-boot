@@ -75,7 +75,7 @@ development_status:
   # Epic 4: 会话管理
   epic-4: in-progress
   4-1-session-authentication-plugin: done
-  4-2-remember-me-functionality: backlog
+  4-2-remember-me-functionality: done
   4-3-session-query-api: backlog
   4-4-kick-user-offline: backlog
   epic-4-retrospective: optional
