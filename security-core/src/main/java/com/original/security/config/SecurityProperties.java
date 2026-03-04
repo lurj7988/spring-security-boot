@@ -14,6 +14,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @author Naulu
  * @since 1.0.0
  * @see SecurityConfigurationValidator
+ * @see SessionProperties
  */
 @ConfigurationProperties(prefix = "security")
 public class SecurityProperties {
@@ -78,7 +79,7 @@ public class SecurityProperties {
          * Maximum number of entries to keep in the cache.
          * Default is 1000.
          */
-        private int maxPoolSize = 1000;
+        private int maximumSize = 1000;
 
         /**
          * Time-to-live for cache entries in minutes.
@@ -86,12 +87,12 @@ public class SecurityProperties {
          */
         private long ttlMinutes = 30;
 
-        public int getMaxPoolSize() {
-            return maxPoolSize;
+        public int getMaximumSize() {
+            return maximumSize;
         }
 
-        public void setMaxPoolSize(int maxPoolSize) {
-            this.maxPoolSize = maxPoolSize;
+        public void setMaximumSize(int maximumSize) {
+            this.maximumSize = maximumSize;
         }
 
         public long getTtlMinutes() {
@@ -102,4 +103,5 @@ public class SecurityProperties {
             this.ttlMinutes = ttlMinutes;
         }
     }
+
 }
