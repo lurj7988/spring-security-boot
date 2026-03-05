@@ -81,8 +81,8 @@ development_status:
   epic-4-retrospective: optional
 
   # Epic 5: 用户管理默认实现
-  epic-5: backlog
-  5-1-user-data-model-repository: backlog
+  epic-5: in-progress
+  5-1-user-data-model-repository: done
   5-2-user-creation-api: backlog
   5-3-user-query-api: backlog
   5-4-password-management-api: backlog
