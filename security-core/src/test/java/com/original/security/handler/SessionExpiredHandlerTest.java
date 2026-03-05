@@ -9,12 +9,15 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.session.SessionInformation;
+import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.web.session.SessionInformationExpiredEvent;
 
 import java.util.Date;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * SessionExpiredHandler 单元测试。
@@ -29,13 +32,15 @@ class SessionExpiredHandlerTest {
 
     private SessionExpiredHandler handler;
     private ObjectMapper objectMapper;
+    private SessionRegistry sessionRegistry;
     private MockHttpServletRequest request;
     private MockHttpServletResponse response;
 
     @BeforeEach
     void setUp() throws Exception {
         objectMapper = new ObjectMapper();
-        handler = new SessionExpiredHandler(objectMapper);
+        sessionRegistry = mock(SessionRegistry.class);
+        handler = new SessionExpiredHandler(objectMapper, sessionRegistry);
         request = new MockHttpServletRequest();
         response = new MockHttpServletResponse();
 
@@ -82,7 +87,14 @@ class SessionExpiredHandlerTest {
     @DisplayName("onExpiredSessionDetected_ContainsErrorMessage")
     void testOnExpiredSessionDetected_ContainsErrorMessage() throws Exception {
         // Given
-        SessionInformationExpiredEvent event = createEvent();
+        SessionInformation sessionInformation = new SessionInformation(
+                "testUser", "testSessionId123", new Date());
+
+        // Mock sessionRegistry to return the session (session exists but expired naturally)
+        when(sessionRegistry.getSessionInformation("testSessionId123")).thenReturn(sessionInformation);
+
+        SessionInformationExpiredEvent event = new SessionInformationExpiredEvent(
+                sessionInformation, request, response);
 
         // When
         handler.onExpiredSessionDetected(event);
@@ -133,5 +145,49 @@ class SessionExpiredHandlerTest {
         String responseBody = response.getContentAsString();
         // 验证返回的是有效 JSON
         assertDoesNotThrow(() -> objectMapper.readTree(responseBody));
+    }
+
+    @Test
+    @DisplayName("onExpiredSessionDetected_WhenSessionKicked_ReturnsKickedMessage")
+    void testOnExpiredSessionDetected_WhenSessionKicked_ReturnsKickedMessage() throws Exception {
+        // Given
+        SessionInformation sessionInformation = new SessionInformation(
+                "testUser", "kickedSessionId", new Date());
+
+        // Mock sessionRegistry to return null (session was kicked)
+        when(sessionRegistry.getSessionInformation("kickedSessionId")).thenReturn(null);
+
+        SessionInformationExpiredEvent event = new SessionInformationExpiredEvent(
+                sessionInformation, request, response);
+
+        // When
+        handler.onExpiredSessionDetected(event);
+
+        // Then
+        String responseBody = response.getContentAsString();
+        assertTrue(responseBody.contains("账号已在其他设备登录"),
+                "Should return kicked message when session is not in registry");
+    }
+
+    @Test
+    @DisplayName("onExpiredSessionDetected_WhenSessionExists_ReturnsExpiredMessage")
+    void testOnExpiredSessionDetected_WhenSessionExists_ReturnsExpiredMessage() throws Exception {
+        // Given
+        SessionInformation sessionInformation = new SessionInformation(
+                "testUser", "expiredSessionId", new Date());
+
+        // Mock sessionRegistry to return session (session exists but expired)
+        when(sessionRegistry.getSessionInformation("expiredSessionId")).thenReturn(sessionInformation);
+
+        SessionInformationExpiredEvent event = new SessionInformationExpiredEvent(
+                sessionInformation, request, response);
+
+        // When
+        handler.onExpiredSessionDetected(event);
+
+        // Then
+        String responseBody = response.getContentAsString();
+        assertTrue(responseBody.contains("会话已过期，请重新登录"),
+                "Should return expired message when session exists in registry");
     }
 }

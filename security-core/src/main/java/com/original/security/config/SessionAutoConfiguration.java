@@ -113,16 +113,19 @@ public class SessionAutoConfiguration {
      * <p>
      * 当用户的 Session 过期或因并发登录被踢出时，该策略负责处理响应。
      * 返回 401 Unauthorized 状态码和 JSON 格式的错误信息。
+     * 对于被管理员踢出的场景，返回特定消息"账号已在其他设备登录"。
      * </p>
      *
      * @param objectMapper JSON 序列化器
+     * @param sessionRegistry Session 注册表（用于检测会话是否被踢出）
      * @return SessionInformationExpiredStrategy 实例
      */
     @Bean
     @ConditionalOnMissingBean(SessionInformationExpiredStrategy.class)
-    public SessionInformationExpiredStrategy sessionInformationExpiredStrategy(ObjectMapper objectMapper) {
-        log.info("Session auto-configuration: Registering SessionExpiredHandler");
-        return new SessionExpiredHandler(objectMapper);
+    public SessionInformationExpiredStrategy sessionInformationExpiredStrategy(
+            ObjectMapper objectMapper, SessionRegistry sessionRegistry) {
+        log.info("Session auto-configuration: Registering SessionExpiredHandler with SessionRegistry");
+        return new SessionExpiredHandler(objectMapper, sessionRegistry);
     }
 
     /**

@@ -1,19 +1,25 @@
 package com.original.security.controller;
 
 import com.original.security.core.Response;
+import com.original.security.dto.KickResult;
 import com.original.security.dto.PageResult;
 import com.original.security.dto.SessionInfo;
+import com.original.security.event.SessionKickEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.session.SessionInformation;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,7 +32,7 @@ import java.util.stream.Collectors;
 /**
  * 会话管理控制器。
  * <p>
- * 提供对活跃会话的查询功能。
+ * 提供对活跃会话的查询和踢出功能。
  * 依赖于 {@link SessionRegistry}，在无状态模式（如纯 JWT 且不保存会话记录）下，可能返回空数据。
  * </p>
  *
@@ -44,10 +50,23 @@ public class SessionController {
     private static final int MAX_PAGE_SIZE = 1000;
     private static final int DEFAULT_PAGE_SIZE = 10;
 
-    private final ObjectProvider<SessionRegistry> sessionRegistryProvider;
+    // 踢出原因常量
+    private static final String KICK_REASON_ADMIN = "admin_kick";
+    private static final String KICK_REASON_ADMIN_SESSION = "admin_kick_session";
 
-    public SessionController(ObjectProvider<SessionRegistry> sessionRegistryProvider) {
+    private final ObjectProvider<SessionRegistry> sessionRegistryProvider;
+    private final ApplicationEventPublisher eventPublisher;
+
+    /**
+     * 构造会话管理控制器。
+     *
+     * @param sessionRegistryProvider SessionRegistry 提供者
+     * @param eventPublisher 事件发布器
+     */
+    public SessionController(ObjectProvider<SessionRegistry> sessionRegistryProvider,
+                         ApplicationEventPublisher eventPublisher) {
         this.sessionRegistryProvider = sessionRegistryProvider;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -155,6 +174,179 @@ public class SessionController {
                 username, sessionInfos.size(), duration);
 
         return Response.successBuilder(sessionInfos).build();
+    }
+
+    /**
+     * 强制指定用户的所有会话下线（仅限管理员）。
+     *
+     * @param userId 目标用户 ID
+     * @param reason 踢出原因（可选，默认为 "admin_kick"）
+     * @return 踢出结果
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/{userId}/kick")
+    public Response<KickResult> kickUser(
+            @PathVariable String userId,
+            @RequestParam(value = "reason", required = false) String reason) {
+        long startTime = System.currentTimeMillis();
+
+        // 参数校验：userId 不能为空或空白
+        if (!StringUtils.hasText(userId)) {
+            log.warn("Invalid userId parameter: empty or blank");
+            return Response.<KickResult>withBuilder(400)
+                    .msg("userId cannot be empty or blank")
+                    .build();
+        }
+
+        SessionRegistry sessionRegistry = sessionRegistryProvider.getIfAvailable();
+        if (sessionRegistry == null) {
+            log.warn(WARN_SESSION_REGISTRY_UNAVAILABLE);
+            return Response.<KickResult>withBuilder(500)
+                    .msg("SessionRegistry not available, cannot kick user")
+                    .build();
+        }
+
+        String operator = getCurrentUsername();
+        String kickReason = StringUtils.hasText(reason) ? reason : KICK_REASON_ADMIN;
+        log.info("Kicking user: userId={}, operator={}, reason={}", userId, operator, kickReason);
+
+        List<SessionInformation> sessionsToKick = new ArrayList<>();
+        List<Object> principals = sessionRegistry.getAllPrincipals();
+
+        // 查找目标用户的所有会话
+        for (Object principal : principals) {
+            String username = extractUsername(principal);
+            if (userId.equals(username)) {
+                List<SessionInformation> sessions = sessionRegistry.getAllSessions(principal, false);
+                // 过滤掉已过期的会话
+                for (SessionInformation session : sessions) {
+                    if (!session.isExpired()) {
+                        sessionsToKick.add(session);
+                    }
+                }
+            }
+        }
+
+        // 执行踢出操作
+        int kickedCount = 0;
+        for (SessionInformation session : sessionsToKick) {
+            sessionRegistry.removeSessionInformation(session.getSessionId());
+            log.debug("Removed session: sessionId={}, userId={}", session.getSessionId(), userId);
+            kickedCount++;
+
+            // 发布踢出事件
+            eventPublisher.publishEvent(new SessionKickEvent(
+                    this,
+                    userId,
+                    session.getSessionId(),
+                    operator,
+                    kickReason
+            ));
+        }
+
+        KickResult result = new KickResult(userId, kickedCount,
+                kickedCount > 0 ? "User kicked successfully" : "No active sessions found for user");
+
+        long duration = System.currentTimeMillis() - startTime;
+        log.info("Kick user completed: userId={}, kicked={}, duration={}ms",
+                userId, kickedCount, duration);
+
+        return Response.successBuilder(result).build();
+    }
+
+    /**
+     * 踢出指定会话（仅限管理员）。
+     *
+     * @param sessionId 目标会话 ID
+     * @param reason 踢出原因（可选，默认为 "admin_kick_session"）
+     * @return 踢出结果
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/{sessionId}/kick")
+    public Response<KickResult> kickSession(
+            @PathVariable String sessionId,
+            @RequestParam(value = "reason", required = false) String reason) {
+        long startTime = System.currentTimeMillis();
+
+        // 参数校验：sessionId 不能为空或空白
+        if (!StringUtils.hasText(sessionId)) {
+            log.warn("Invalid sessionId parameter: empty or blank");
+            return Response.<KickResult>withBuilder(400)
+                    .msg("sessionId cannot be empty or blank")
+                    .build();
+        }
+
+        SessionRegistry sessionRegistry = sessionRegistryProvider.getIfAvailable();
+        if (sessionRegistry == null) {
+            log.warn(WARN_SESSION_REGISTRY_UNAVAILABLE);
+            return Response.<KickResult>withBuilder(500)
+                    .msg("SessionRegistry not available, cannot kick session")
+                    .build();
+        }
+
+        String operator = getCurrentUsername();
+        String kickReason = StringUtils.hasText(reason) ? reason : KICK_REASON_ADMIN_SESSION;
+        log.info("Kicking session: sessionId={}, operator={}, reason={}", sessionId, operator, kickReason);
+
+        // 查找指定会话
+        SessionInformation targetSession = null;
+        String userId = null;
+        List<Object> principals = sessionRegistry.getAllPrincipals();
+
+        for (Object principal : principals) {
+            userId = extractUsername(principal);
+            List<SessionInformation> sessions = sessionRegistry.getAllSessions(principal, false);
+            for (SessionInformation session : sessions) {
+                if (sessionId.equals(session.getSessionId()) && !session.isExpired()) {
+                    targetSession = session;
+                    break;
+                }
+            }
+            if (targetSession != null) {
+                break;
+            }
+        }
+
+        if (targetSession == null) {
+            log.warn("Session not found or already expired: sessionId={}", sessionId);
+            return Response.<KickResult>withBuilder(404)
+                    .msg("Session not found or already expired")
+                    .build();
+        }
+
+        // 执行踢出操作
+        sessionRegistry.removeSessionInformation(sessionId);
+        log.debug("Removed session: sessionId={}", sessionId);
+
+        // 发布踢出事件
+        eventPublisher.publishEvent(new SessionKickEvent(
+                this,
+                userId,
+                sessionId,
+                operator,
+                kickReason
+        ));
+
+        KickResult result = new KickResult(userId, 1, "Session kicked successfully");
+
+        long duration = System.currentTimeMillis() - startTime;
+        log.info("Kick session completed: sessionId={}, userId={}, duration={}ms",
+                sessionId, userId, duration);
+
+        return Response.successBuilder(result).build();
+    }
+
+    /**
+     * 获取当前登录用户名。
+     *
+     * @return 用户名
+     */
+    private String getCurrentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() != null) {
+            return extractUsername(authentication.getPrincipal());
+        }
+        return "unknown";
     }
 
     private String extractUsername(Object principal) {
