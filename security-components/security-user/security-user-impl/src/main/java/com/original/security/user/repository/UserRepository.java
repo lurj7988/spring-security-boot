@@ -40,6 +40,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByUsername(String username);
 
     /**
+     * 检查邮箱是否存在
+     *
+     * @param email 邮箱
+     * @return true 如果存在，false 如果不存在
+     */
+    boolean existsByEmail(String email);
+
+    /**
      * 根据角色名称查找用户 (用于缓存精确失效)
      *
      * @param roleName 角色名称
