@@ -9,6 +9,8 @@ import com.original.security.user.entity.User;
 import com.original.security.user.event.UserCreatedEvent;
 import com.original.security.user.exception.EmailAlreadyExistsException;
 import com.original.security.user.exception.UserAlreadyExistsException;
+import com.original.security.user.exception.UserDisabledException;
+import com.original.security.user.exception.UserNotFoundException;
 import com.original.security.user.repository.RoleRepository;
 import com.original.security.user.repository.UserRepository;
 import com.original.security.user.service.UserService;
@@ -18,12 +20,13 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -133,9 +136,37 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserDTO getCurrentUser() {
-        // TODO: 从 Spring Security 上下文获取当前用户
-        // 在 Story 5.3 中实现
-        throw new UnsupportedOperationException("getCurrentUser() 将在 Story 5.3 中实现");
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        // 验证认证状态
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            log.warn("未授权的访问尝试: 获取当前用户");
+            throw new IllegalStateException("用户未认证");
+        }
+
+        String username = authentication.getName();
+
+        // 验证用户名有效性
+        if (username == null || username.trim().isEmpty()) {
+            log.warn("认证上下文中用户名为空");
+            throw new IllegalStateException("用户未认证");
+        }
+
+        // 查找用户
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> {
+                    log.warn("认证用户不存在于数据库: username={}", username);
+                    return new UserNotFoundException(username);
+                });
+
+        // 验证用户是否被禁用
+        if (!user.isEnabled()) {
+            log.warn("尝试访问已禁用的用户: username={}", username);
+            throw new UserDisabledException(username);
+        }
+
+        log.info("获取当前用户成功: username={}, userId={}", username, user.getId());
+        return toDTO(user);
     }
 
     @Override
@@ -143,16 +174,20 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> {
                     log.warn("用户不存在: userId={}", userId);
-                    return new IllegalArgumentException("用户不存在");
+                    return new UserNotFoundException(userId);
                 });
 
         return toDTO(user);
     }
 
     @Override
-    public PageDTO<UserDTO> listUsers(int page, int size) {
+    public PageDTO<UserDTO> listUsers(int page, int size, String usernameKeyword, Boolean enabled) {
         // 参数验证
         if (page < 0) {
+            page = 0;
+        }
+        if (page > 10000) {
+            log.warn("分页参数过大，已限制: requestedPage={}, actualPage=0", page);
             page = 0;
         }
         if (size <= 0 || size > MAX_PAGE_SIZE) {
@@ -160,7 +195,15 @@ public class UserServiceImpl implements UserService {
         }
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<User> userPage = userRepository.findAll(pageable);
+        Page<User> userPage;
+
+        // 使用统一的查询方法，支持所有筛选条件
+        String trimmedKeyword = (usernameKeyword != null) ? usernameKeyword.trim() : null;
+        if (trimmedKeyword != null && trimmedKeyword.isEmpty()) {
+            trimmedKeyword = null;
+        }
+
+        userPage = userRepository.findByUsernameContainingAndEnabled(trimmedKeyword, enabled, pageable);
 
         return new PageDTO<>(
                 userPage.getContent().stream()

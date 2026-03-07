@@ -36,11 +36,13 @@ public interface UserService {
     UserDTO getUser(Long userId);
 
     /**
-     * 获取用户列表
+     * 获取用户列表（支持分页、用户名模糊查询和状态筛选）
      *
      * @param page 页码
      * @param size 每页大小
+     * @param usernameKeyword 用户名关键词（模糊查询，可选）
+     * @param enabled 用户启用状态（true/false，可选）
      * @return 分页用户列表
      */
-    PageDTO<UserDTO> listUsers(int page, int size);
+    PageDTO<UserDTO> listUsers(int page, int size, String usernameKeyword, Boolean enabled);
 }

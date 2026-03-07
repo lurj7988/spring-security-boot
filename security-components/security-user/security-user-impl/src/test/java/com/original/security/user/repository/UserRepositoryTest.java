@@ -5,12 +5,21 @@ import com.original.security.user.entity.Role;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.TestPropertySource;
 
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * UserRepository 单元测试
+ *
+ * @author Original Security Team
+ * @since 1.0.0
+ */
 @DataJpaTest
 @TestPropertySource(properties = {
     "spring.datasource.url=jdbc:h2:mem:testdb",
@@ -180,5 +189,147 @@ class UserRepositoryTest {
 
         long finalCount = userRepository.count();
         assertEquals(initialCount + 1, finalCount);
+    }
+
+    // ==================== 新增测试：模糊查询和筛选功能 ====================
+
+    /**
+     * 测试模糊查询和启用状态筛选 - 无筛选条件
+     */
+    @Test
+    void testFindByUsernameContainingAndEnabled_NoFilters_ReturnsAllUsers() {
+        // Given
+        createTestUser("user1", "user1@example.com", true);
+        createTestUser("user2", "user2@example.com", true);
+        createTestUser("user3", "user3@example.com", false);
+
+        Pageable pageable = PageRequest.of(0, 10);
+
+        // When
+        Page<User> result = userRepository.findByUsernameContainingAndEnabled(null, null, pageable);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(3, result.getTotalElements());
+    }
+
+    /**
+     * 测试模糊查询 - 按用户名关键词
+     */
+    @Test
+    void testFindByUsernameContainingAndEnabled_UsernameFilter_ReturnsMatchingUsers() {
+        // Given
+        createTestUser("alice_test", "alice@test.com", true);
+        createTestUser("bob_test", "bob@test.com", true);
+        createTestUser("charlie_other", "charlie@test.com", true);
+
+        Pageable pageable = PageRequest.of(0, 10);
+
+        // When - 搜索包含 "test" 的用户名
+        Page<User> result = userRepository.findByUsernameContainingAndEnabled("test", null, pageable);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(2, result.getTotalElements());
+        assertTrue(result.getContent().stream().allMatch(u -> u.getUsername().contains("test")));
+    }
+
+    /**
+     * 测试状态筛选 - 按启用状态
+     */
+    @Test
+    void testFindByUsernameContainingAndEnabled_EnabledFilter_ReturnsMatchingUsers() {
+        // Given
+        createTestUser("enabled_user", "enabled@test.com", true);
+        createTestUser("disabled_user", "disabled@test.com", false);
+        createTestUser("another_enabled", "another@test.com", true);
+
+        Pageable pageable = PageRequest.of(0, 10);
+
+        // When - 搜索启用的用户
+        Page<User> result = userRepository.findByUsernameContainingAndEnabled(null, true, pageable);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(2, result.getTotalElements());
+        assertTrue(result.getContent().stream().allMatch(User::isEnabled));
+    }
+
+    /**
+     * 测试状态筛选 - 按禁用状态
+     */
+    @Test
+    void testFindByUsernameContainingAndEnabled_DisabledFilter_ReturnsMatchingUsers() {
+        // Given
+        createTestUser("enabled_user", "enabled@test.com", true);
+        createTestUser("disabled_user1", "disabled1@test.com", false);
+        createTestUser("disabled_user2", "disabled2@test.com", false);
+
+        Pageable pageable = PageRequest.of(0, 10);
+
+        // When - 搜索禁用的用户
+        Page<User> result = userRepository.findByUsernameContainingAndEnabled(null, false, pageable);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(2, result.getTotalElements());
+        assertTrue(result.getContent().stream().noneMatch(User::isEnabled));
+    }
+
+    /**
+     * 测试组合筛选 - 用户名和状态同时筛选
+     */
+    @Test
+    void testFindByUsernameContainingAndEnabled_CombinedFilters_ReturnsMatchingUsers() {
+        // Given
+        createTestUser("alice_enabled", "alice1@test.com", true);
+        createTestUser("alice_disabled", "alice2@test.com", false);
+        createTestUser("bob_enabled", "bob@test.com", true);
+
+        Pageable pageable = PageRequest.of(0, 10);
+
+        // When - 搜索包含 "alice" 且启用的用户
+        Page<User> result = userRepository.findByUsernameContainingAndEnabled("alice", true, pageable);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals("alice_enabled", result.getContent().get(0).getUsername());
+        assertTrue(result.getContent().get(0).isEnabled());
+    }
+
+    /**
+     * 测试分页功能
+     */
+    @Test
+    void testFindByUsernameContainingAndEnabled_Pagination_ReturnsPagedResults() {
+        // Given - 创建 5 个用户
+        for (int i = 1; i <= 5; i++) {
+            createTestUser("user" + i, "user" + i + "@example.com", true);
+        }
+
+        Pageable pageable = PageRequest.of(0, 2); // 第一页，每页2条
+
+        // When
+        Page<User> result = userRepository.findByUsernameContainingAndEnabled(null, null, pageable);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(5, result.getTotalElements());
+        assertEquals(3, result.getTotalPages()); // 5条数据，每页2条 = 3页
+        assertEquals(2, result.getContent().size()); // 当前页2条
+        assertEquals(0, result.getNumber()); // 第一页
+    }
+
+    /**
+     * 辅助方法：创建测试用户
+     */
+    private User createTestUser(String username, String email, boolean enabled) {
+        User user = new User();
+        user.setUsername(username);
+        user.setEmail(email);
+        user.setPassword("encoded_password");
+        user.setEnabled(enabled);
+        return userRepository.save(user);
     }
 }

@@ -8,6 +8,8 @@ import com.original.security.user.entity.Role;
 import com.original.security.user.entity.User;
 import com.original.security.user.exception.EmailAlreadyExistsException;
 import com.original.security.user.exception.UserAlreadyExistsException;
+import com.original.security.user.exception.UserDisabledException;
+import com.original.security.user.exception.UserNotFoundException;
 import com.original.security.user.event.UserCreatedEvent;
 import com.original.security.user.repository.RoleRepository;
 import com.original.security.user.repository.UserRepository;
@@ -206,7 +208,7 @@ class UserServiceImplTest {
 
         // When & Then
         assertThrows(
-                IllegalArgumentException.class,
+                UserNotFoundException.class,
                 () -> userService.getUser(1L)
         );
     }
@@ -217,7 +219,7 @@ class UserServiceImplTest {
         User user1 = new User(1L, "user1", "pass1", "email1@example.com", true, LocalDateTime.now(), new HashSet<>());
         User user2 = new User(2L, "user2", "pass2", "email2@example.com", true, LocalDateTime.now(), new HashSet<>());
 
-        when(userRepository.findAll(any(PageRequest.class)))
+        when(userRepository.findByUsernameContainingAndEnabled(isNull(), isNull(), any(PageRequest.class)))
                 .thenReturn(new PageImpl<>(
                         Arrays.asList(user1, user2),
                         PageRequest.of(0, 10),
@@ -225,7 +227,7 @@ class UserServiceImplTest {
                 ));
 
         // When
-        PageDTO<UserDTO> result = userService.listUsers(0, 10);
+        PageDTO<UserDTO> result = userService.listUsers(0, 10, null, null);
 
         // Then
         assertNotNull(result);
@@ -233,6 +235,137 @@ class UserServiceImplTest {
         assertEquals(0, result.getNumber());
         assertEquals(10, result.getSize());
         assertEquals(2, result.getTotalElements());
+    }
+
+    @Test
+    void testListUsersWithFilters_UsernameFilter_ReturnsFilteredUsers() {
+        // Given
+        User user1 = new User(1L, "alice_test", "pass1", "alice@test.com", true, LocalDateTime.now(), new HashSet<>());
+        User user2 = new User(2L, "bob_test", "pass2", "bob@test.com", true, LocalDateTime.now(), new HashSet<>());
+        User user3 = new User(3L, "charlie_other", "pass3", "charlie@test.com", true, LocalDateTime.now(), new HashSet<>());
+
+        when(userRepository.findByUsernameContainingAndEnabled(eq("test"), eq(null), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(
+                        Arrays.asList(user1, user2),
+                        PageRequest.of(0, 10),
+                        2
+                ));
+
+        // When
+        PageDTO<UserDTO> result = userService.listUsers(0, 10, "test", null);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(2, result.getContent().size());
+        assertTrue(result.getContent().stream().anyMatch(dto -> dto.getUsername().contains("test")));
+    }
+
+    @Test
+    void testListUsersWithFilters_EnabledFilter_ReturnsFilteredUsers() {
+        // Given
+        User enabledUser = new User(1L, "enabled_user", "pass1", "enabled@test.com", true, LocalDateTime.now(), new HashSet<>());
+        User disabledUser = new User(2L, "disabled_user", "pass2", "disabled@test.com", false, LocalDateTime.now(), new HashSet<>());
+
+        when(userRepository.findByUsernameContainingAndEnabled(eq(null), eq(true), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(
+                        Arrays.asList(enabledUser),
+                        PageRequest.of(0, 10),
+                        1
+                ));
+
+        // When
+        PageDTO<UserDTO> result = userService.listUsers(0, 10, null, true);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertEquals(true, result.getContent().get(0).isEnabled());
+    }
+
+    @Test
+    void testListUsersWithFilters_DisabledFilter_ReturnsFilteredUsers() {
+        // Given
+        User enabledUser = new User(1L, "enabled_user", "pass1", "enabled@test.com", true, LocalDateTime.now(), new HashSet<>());
+        User disabledUser = new User(2L, "disabled_user", "pass2", "disabled@test.com", false, LocalDateTime.now(), new HashSet<>());
+
+        when(userRepository.findByUsernameContainingAndEnabled(eq(null), eq(false), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(
+                        Arrays.asList(disabledUser),
+                        PageRequest.of(0, 10),
+                        1
+                ));
+
+        // When
+        PageDTO<UserDTO> result = userService.listUsers(0, 10, null, false);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertEquals(false, result.getContent().get(0).isEnabled());
+    }
+
+    @Test
+    void testListUsersWithFilters_CombinedFilters_ReturnsFilteredUsers() {
+        // Given
+        User matchingUser = new User(1L, "alice_enabled", "pass1", "alice@test.com", true, LocalDateTime.now(), new HashSet<>());
+
+        when(userRepository.findByUsernameContainingAndEnabled(eq("alice"), eq(true), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(
+                        Arrays.asList(matchingUser),
+                        PageRequest.of(0, 10),
+                        1
+                ));
+
+        // When
+        PageDTO<UserDTO> result = userService.listUsers(0, 10, "alice", true);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(1, result.getContent().size());
+        assertTrue(result.getContent().get(0).getUsername().contains("alice"));
+        assertTrue(result.getContent().get(0).isEnabled());
+    }
+
+    @Test
+    void testListUsersWithFilters_NoFilters_ReturnsAllUsers() {
+        // Given
+        User user1 = new User(1L, "user1", "pass1", "email1@example.com", true, LocalDateTime.now(), new HashSet<>());
+        User user2 = new User(2L, "user2", "pass2", "email2@example.com", true, LocalDateTime.now(), new HashSet<>());
+
+        when(userRepository.findByUsernameContainingAndEnabled(isNull(), isNull(), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(
+                        Arrays.asList(user1, user2),
+                        PageRequest.of(0, 10),
+                        2
+                ));
+
+        // When
+        PageDTO<UserDTO> result = userService.listUsers(0, 10, null, null);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(2, result.getContent().size());
+        verify(userRepository).findByUsernameContainingAndEnabled(isNull(), isNull(), any(PageRequest.class));
+    }
+
+    @Test
+    void testListUsersWithFilters_EmptyStringKeyword_TreatedAsNull() {
+        // Given
+        User user1 = new User(1L, "user1", "pass1", "email1@example.com", true, LocalDateTime.now(), new HashSet<>());
+        User user2 = new User(2L, "user2", "pass2", "email2@example.com", true, LocalDateTime.now(), new HashSet<>());
+
+        when(userRepository.findByUsernameContainingAndEnabled(eq(null), eq(null), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(
+                        Arrays.asList(user1, user2),
+                        PageRequest.of(0, 10),
+                        2
+                ));
+
+        // When - 使用空字符串作为关键字
+        PageDTO<UserDTO> result = userService.listUsers(0, 10, "", null);
+
+        // Then - 应该当作null来处理（即不过滤用户名）
+        verify(userRepository).findByUsernameContainingAndEnabled(eq(null), eq(null), any(PageRequest.class));
     }
 
     @Test
@@ -295,11 +428,11 @@ class UserServiceImplTest {
     @Test
     void testListUsers_NegativePage_ReturnsFirstPage() {
         // Given
-        when(userRepository.findAll(any(PageRequest.class)))
+        when(userRepository.findByUsernameContainingAndEnabled(isNull(), isNull(), any(PageRequest.class)))
                 .thenReturn(new PageImpl<>(Arrays.asList(), PageRequest.of(0, 10), 0));
 
         // When - 传入负数页码
-        PageDTO<UserDTO> result = userService.listUsers(-1, 10);
+        PageDTO<UserDTO> result = userService.listUsers(-1, 10, null, null);
 
         // Then - 应该返回第一页
         assertNotNull(result);
@@ -312,11 +445,11 @@ class UserServiceImplTest {
     @Test
     void testListUsers_ExcessiveSize_UsesDefaultSize() {
         // Given
-        when(userRepository.findAll(any(PageRequest.class)))
+        when(userRepository.findByUsernameContainingAndEnabled(isNull(), isNull(), any(PageRequest.class)))
                 .thenReturn(new PageImpl<>(Arrays.asList(), PageRequest.of(0, 10), 0));
 
         // When - 传入过大的 size
-        PageDTO<UserDTO> result = userService.listUsers(0, 1000);
+        PageDTO<UserDTO> result = userService.listUsers(0, 1000, null, null);
 
         // Then - 应该使用默认大小
         assertNotNull(result);

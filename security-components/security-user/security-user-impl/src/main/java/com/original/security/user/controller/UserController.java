@@ -7,7 +7,11 @@ import com.original.security.user.api.dto.response.PageDTO;
 import com.original.security.user.api.dto.response.UserDTO;
 import com.original.security.user.exception.EmailAlreadyExistsException;
 import com.original.security.user.exception.UserAlreadyExistsException;
+import com.original.security.user.exception.UserDisabledException;
+import com.original.security.user.exception.UserNotFoundException;
 import com.original.security.user.service.UserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -27,12 +31,17 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/users")
 public class UserController implements UserApi {
 
+    private static final Logger log = LoggerFactory.getLogger(UserController.class);
+
     /**
      * 业务错误码常量
      */
     private static final String ERROR_CODE_USER_ALREADY_EXISTS = "USER_ALREADY_EXISTS";
     private static final String ERROR_CODE_EMAIL_ALREADY_EXISTS = "EMAIL_ALREADY_EXISTS";
     private static final String ERROR_CODE_INVALID_REQUEST = "INVALID_REQUEST";
+    private static final String ERROR_CODE_USER_NOT_FOUND = "USER_NOT_FOUND";
+    private static final String ERROR_CODE_USER_DISABLED = "USER_DISABLED";
+    private static final String ERROR_CODE_UNAUTHORIZED = "UNAUTHORIZED";
 
     private final UserService userService;
 
@@ -59,8 +68,8 @@ public class UserController implements UserApi {
     }
 
     @Override
-    public Response<PageDTO<UserDTO>> listUsers(int page, int size) {
-        PageDTO<UserDTO> users = userService.listUsers(page, size);
+    public Response<PageDTO<UserDTO>> listUsers(int page, int size, String username, Boolean enabled) {
+        PageDTO<UserDTO> users = userService.listUsers(page, size, username, enabled);
         return Response.successBuilder(users).msg("success").build();
     }
 
@@ -98,23 +107,35 @@ public class UserController implements UserApi {
     }
 
     /**
-     * 处理其他业务异常
+     * 处理用户不存在异常
      */
-    @ExceptionHandler(IllegalArgumentException.class)
-    public Response<Void> handleIllegalArgumentException(IllegalArgumentException e) {
-        // 根据异常类型确定 HTTP 状态码
-        String message = e.getMessage();
-        int code = 400; // 默认 400 Bad Request
-        if (message != null) {
-            // 资源不存在场景
-            if (message.contains("用户不存在") || message.contains("userId") || message.contains("ID")) {
-                code = 404;
-            }
-            // 参数验证失败场景
-            else if (message.contains("无效") || message.contains("不符合") || message.contains("不合法")) {
-                code = 400;
-            }
-        }
-        return Response.<Void>withBuilder(code).msg(message).build();
+    @ExceptionHandler(UserNotFoundException.class)
+    public Response<Void> handleUserNotFoundException(UserNotFoundException e) {
+        log.warn("用户不存在: {}", e.getIdentifier());
+        return Response.<Void>withBuilder(404)
+                .msg("[" + ERROR_CODE_USER_NOT_FOUND + "] " + e.getMessage())
+                .build();
+    }
+
+    /**
+     * 处理用户已禁用异常
+     */
+    @ExceptionHandler(UserDisabledException.class)
+    public Response<Void> handleUserDisabledException(UserDisabledException e) {
+        log.warn("用户已禁用: {}", e.getUsername());
+        return Response.<Void>withBuilder(403)
+                .msg("[" + ERROR_CODE_USER_DISABLED + "] " + e.getMessage())
+                .build();
+    }
+
+    /**
+     * 处理认证异常（用户未认证）
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    public Response<Void> handleIllegalStateException(IllegalStateException e) {
+        log.warn("认证异常: {}", e.getMessage());
+        return Response.<Void>withBuilder(401)
+                .msg("[" + ERROR_CODE_UNAUTHORIZED + "] " + e.getMessage())
+                .build();
     }
 }
