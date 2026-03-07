@@ -84,7 +84,7 @@ development_status:
   epic-5: in-progress
   5-1-user-data-model-repository: done
   5-2-user-creation-api: done
-  5-3-user-query-api: backlog
+  5-3-user-query-api: done
   5-4-password-management-api: backlog
   epic-5-retrospective: optional
 
