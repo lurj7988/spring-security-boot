@@ -4,12 +4,14 @@ import com.original.security.config.SecurityProperties;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
  * 测试环境的安全配置
- * 提供测试所需的 SecurityProperties 和 PasswordEncoder bean
+ * 提供测试所需的 SecurityProperties、PasswordEncoder 和 SessionRegistry bean
  *
  * @author Original Security Team
  * @since 1.0.0
@@ -34,5 +36,14 @@ public class TestSecurityConfig {
     @Primary
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(DEFAULT_PASSWORD_STRENGTH);
+    }
+
+    /**
+     * 提供 SessionRegistry Bean 用于测试环境
+     */
+    @Bean
+    @Primary
+    public SessionRegistry sessionRegistry() {
+        return new SessionRegistryImpl();
     }
 }

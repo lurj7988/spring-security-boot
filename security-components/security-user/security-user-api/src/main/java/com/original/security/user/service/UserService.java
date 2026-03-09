@@ -1,5 +1,6 @@
 package com.original.security.user.service;
 
+import com.original.security.user.api.dto.request.PasswordChangeRequest;
 import com.original.security.user.api.dto.request.UserCreateRequest;
 import com.original.security.user.api.dto.response.PageDTO;
 import com.original.security.user.api.dto.response.UserDTO;
@@ -45,4 +46,19 @@ public interface UserService {
      * @return 分页用户列表
      */
     PageDTO<UserDTO> listUsers(int page, int size, String usernameKeyword, Boolean enabled);
+
+    /**
+     * 修改当前用户密码
+     *
+     * @param request 密码修改请求
+     */
+    void changePassword(PasswordChangeRequest request);
+
+    /**
+     * 重置指定用户密码
+     *
+     * @param userId 用户ID
+     * @return 新生成的密码
+     */
+    String resetPassword(Long userId);
 }

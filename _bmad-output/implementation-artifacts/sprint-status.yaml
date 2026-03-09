@@ -85,7 +85,7 @@ development_status:
   5-1-user-data-model-repository: done
   5-2-user-creation-api: done
   5-3-user-query-api: done
-  5-4-password-management-api: backlog
+  5-4-password-management-api: done
   epic-5-retrospective: optional
 
   # Epic 6: 可观测性与测试支持

@@ -1,8 +1,10 @@
 package com.original.security.user.api;
 
 import com.original.security.core.Response;
+import com.original.security.user.api.dto.request.PasswordChangeRequest;
 import com.original.security.user.api.dto.request.UserCreateRequest;
 import com.original.security.user.api.dto.response.PageDTO;
+import com.original.security.user.api.dto.response.PasswordResetResponse;
 import com.original.security.user.api.dto.response.UserDTO;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -62,4 +64,26 @@ public interface UserApi {
                                         @RequestParam(value = "size", defaultValue = "10") int size,
                                         @RequestParam(value = "username", required = false) String username,
                                         @RequestParam(value = "enabled", required = false) Boolean enabled);
+
+    /**
+     * 修改当前用户密码
+     * 需要用户已认证
+     *
+     * @param request 密码修改请求
+     * @return 成功响应
+     */
+    @PostMapping("/me/password")
+    @PreAuthorize("isAuthenticated()")
+    Response<Void> changePassword(@Valid @RequestBody PasswordChangeRequest request);
+
+    /**
+     * 重置指定用户密码
+     * 需要管理员权限
+     *
+     * @param userId 用户ID
+     * @return 包含新密码的响应
+     */
+    @PostMapping("/{userId}/password/reset")
+    @PreAuthorize("hasRole('ADMIN')")
+    Response<PasswordResetResponse> resetPassword(@PathVariable("userId") Long userId);
 }

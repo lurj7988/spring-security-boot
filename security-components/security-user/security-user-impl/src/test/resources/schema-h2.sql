@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(100),
     enabled BOOLEAN DEFAULT TRUE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT uk_users_username UNIQUE (username)
+    CONSTRAINT uk_users_username UNIQUE (username),
+    CONSTRAINT uk_users_email UNIQUE (email)
 );
 
 -- Create roles table

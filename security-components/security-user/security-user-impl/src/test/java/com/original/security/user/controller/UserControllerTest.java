@@ -505,7 +505,64 @@ class UserControllerTest {
         mockMvc.perform(get("/api/users/me"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(403))
-                .andExpect(jsonPath("$.message").value(containsString("已禁用")));
+                .andExpect(jsonPath("$.message").value(containsString("USER_DISABLED")));
+    }
+
+    @Test
+    void testChangePassword_ValidInput_ReturnsSuccess() throws Exception {
+        SecurityContextHolder.clearContext();
+        User testUser = createTestUser("changePassUser", "oldPassword", "change@example.com");
+        setAuthenticatedUser("changePassUser");
+
+        com.original.security.user.api.dto.request.PasswordChangeRequest request = new com.original.security.user.api.dto.request.PasswordChangeRequest();
+        request.setOldPassword("oldPassword");
+        request.setNewPassword("NewPass123!");
+
+        mockMvc.perform(post("/api/users/me/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("success"));
+
+        // Verify password was changed
+        User updatedUser = userRepository.findById(testUser.getId()).orElseThrow(RuntimeException::new);
+        assertTrue(passwordEncoder.matches("NewPass123!", updatedUser.getPassword()));
+    }
+
+    @Test
+    void testChangePassword_InvalidOldPassword_Returns400() throws Exception {
+        SecurityContextHolder.clearContext();
+        createTestUser("changePassUser2", "oldPassword", "change2@example.com");
+        setAuthenticatedUser("changePassUser2");
+
+        com.original.security.user.api.dto.request.PasswordChangeRequest request = new com.original.security.user.api.dto.request.PasswordChangeRequest();
+        request.setOldPassword("wrongOldPassword");
+        request.setNewPassword("NewPass123!");
+
+        mockMvc.perform(post("/api/users/me/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value(containsString("INVALID_OLD_PASSWORD")));
+    }
+
+    @Test
+    void testResetPassword_ValidUserId_ReturnsNewPassword() throws Exception {
+        User testUser = createTestUser("resetPassUser", "oldPassword", "reset@example.com");
+
+        mockMvc.perform(post("/api/users/{userId}/password/reset", testUser.getId())
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("success"))
+                .andExpect(jsonPath("$.data.newPassword").exists())
+                .andExpect(jsonPath("$.data.message").value("密码已重置"));
+
+        // Verify password was changed in DB
+        User updatedUser = userRepository.findById(testUser.getId()).orElseThrow(RuntimeException::new);
+        assertFalse(passwordEncoder.matches("oldPassword", updatedUser.getPassword()));
     }
 
     /**

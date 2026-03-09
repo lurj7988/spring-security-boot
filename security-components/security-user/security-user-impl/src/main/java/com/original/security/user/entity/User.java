@@ -13,7 +13,11 @@ import java.util.Set;
  * @since 1.0.0
  */
 @Entity
-@Table(name = "users")
+@Table(name = "users",
+       uniqueConstraints = {
+           @UniqueConstraint(columnNames = {"username"}, name = "UK_username"),
+           @UniqueConstraint(columnNames = {"email"}, name = "UK_email")
+       })
 public class User {
 
     @Id
@@ -26,7 +30,7 @@ public class User {
     @Column(name = "password", nullable = false, length = 100)
     private String password;
 
-    @Column(name = "email", length = 100)
+    @Column(name = "email", unique = true, length = 100)
     private String email;
 
     @Column(name = "enabled", nullable = false)
