@@ -44,7 +44,7 @@ import java.util.stream.Collectors;
  */
 @Configuration
 @EnableWebSecurity
-@Import({NetworkSecurityAutoConfiguration.class, MethodSecurityConfiguration.class, RememberMeAutoConfiguration.class})
+@Import({NetworkSecurityAutoConfiguration.class, MethodSecurityConfiguration.class, RememberMeAutoConfiguration.class, SecurityMetricsConfig.class})
 public class SecurityAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityAutoConfiguration.class);

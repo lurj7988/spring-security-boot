@@ -19,6 +19,7 @@ import java.io.IOException;
 
 import com.original.security.event.AuditEventPublisher;
 import com.original.security.event.AuthenticationFailureEvent;
+import com.original.security.observability.SecurityMetrics;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -39,10 +40,12 @@ public class FrameAuthenticationFailureHandler implements AuthenticationFailureH
     
     private final ObjectMapper objectMapper;
     private final AuditEventPublisher auditEventPublisher;
+    private final SecurityMetrics securityMetrics;
 
-    public FrameAuthenticationFailureHandler(ObjectMapper objectMapper, AuditEventPublisher auditEventPublisher) {
+    public FrameAuthenticationFailureHandler(ObjectMapper objectMapper, AuditEventPublisher auditEventPublisher, SecurityMetrics securityMetrics) {
         this.objectMapper = objectMapper;
         this.auditEventPublisher = auditEventPublisher;
+        this.securityMetrics = securityMetrics;
     }
 
     @Override
@@ -72,10 +75,15 @@ public class FrameAuthenticationFailureHandler implements AuthenticationFailureH
     }
 
     private void publishAuditFailure(HttpServletRequest request, AuthenticationException exception) {
+        String authMethod = "unknown";
         try {
             String username = request.getParameter("username");
             if (username == null) {
                 username = "unknown";
+            }
+
+            if (request.getAttribute("authMethod") != null) {
+                authMethod = request.getAttribute("authMethod").toString();
             }
 
             Map<String, Object> details = new HashMap<>();
@@ -93,6 +101,14 @@ public class FrameAuthenticationFailureHandler implements AuthenticationFailureH
         } catch (Exception e) {
             // 事件发布失败不应影响正常错误响应
             log.warn("Failed to publish authentication failure audit event: {}", e.getMessage());
+        } finally {
+            // 记录认证失败 metrics
+            try {
+                String failureReason = exception.getClass().getSimpleName();
+                securityMetrics.recordAuthenticationFailure(authMethod, failureReason);
+            } catch (Exception e) {
+                log.warn("Failed to record authentication failure metrics: {}", e.getMessage());
+            }
         }
     }
 }

@@ -25,6 +25,7 @@ import com.original.security.util.JwtUtils;
 
 import com.original.security.event.AuditEventPublisher;
 import com.original.security.event.AuthenticationSuccessEvent;
+import com.original.security.observability.SecurityMetrics;
 
 /**
  * 自定义认证成功处理器
@@ -43,13 +44,16 @@ public class FrameAuthenticationSuccessHandler implements AuthenticationSuccessH
     private final ObjectMapper objectMapper;
     private final ObjectProvider<JwtUtils> jwtUtilsProvider;
     private final AuditEventPublisher auditEventPublisher;
+    private final SecurityMetrics securityMetrics;
 
-    public FrameAuthenticationSuccessHandler(ObjectMapper objectMapper, 
+    public FrameAuthenticationSuccessHandler(ObjectMapper objectMapper,
                                            ObjectProvider<JwtUtils> jwtUtilsProvider,
-                                           AuditEventPublisher auditEventPublisher) {
+                                           AuditEventPublisher auditEventPublisher,
+                                           SecurityMetrics securityMetrics) {
         this.objectMapper = objectMapper;
         this.jwtUtilsProvider = jwtUtilsProvider;
         this.auditEventPublisher = auditEventPublisher;
+        this.securityMetrics = securityMetrics;
     }
 
     @Override
@@ -83,12 +87,12 @@ public class FrameAuthenticationSuccessHandler implements AuthenticationSuccessH
     }
 
     private void publishAuditSuccess(HttpServletRequest request, Authentication authentication) {
+        String authMethod = "unknown";
         try {
             Map<String, Object> details = new HashMap<>();
             details.put("ipAddress", request.getRemoteAddr());
             details.put("userAgent", request.getHeader("User-Agent"));
 
-            String authMethod = "unknown";
             if (request.getAttribute("authMethod") != null) {
                 authMethod = request.getAttribute("authMethod").toString();
             }
@@ -103,6 +107,13 @@ public class FrameAuthenticationSuccessHandler implements AuthenticationSuccessH
         } catch (Exception e) {
             // 事件发布失败不应影响正常认证流程
             log.warn("Failed to publish authentication success audit event: {}", e.getMessage());
+        } finally {
+            // 记录认证成功 metrics
+            try {
+                securityMetrics.recordAuthenticationSuccess(authMethod);
+            } catch (Exception e) {
+                log.warn("Failed to record authentication success metrics: {}", e.getMessage());
+            }
         }
     }
 }

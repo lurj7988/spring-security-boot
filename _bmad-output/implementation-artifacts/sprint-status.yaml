@@ -91,7 +91,7 @@ development_status:
   # Epic 6: 可观测性与测试支持
   epic-6: in-progress
   6-1-audit-event-publishing: done
-  6-2-metrics-indicators: backlog
+  6-2-metrics-indicators: done
   6-3-health-check-endpoint: backlog
   6-4-testing-support-tools: backlog
   6-5-structured-logging: backlog
