@@ -62,6 +62,10 @@ class MethodSecurityIntegrationTest {
             com.original.security.handler.FrameAuthenticationEntryPoint.class
     })
     static class TestApplication {
+        @org.springframework.context.annotation.Bean
+        public com.original.security.event.AuditEventPublisher auditEventPublisher() {
+            return org.mockito.Mockito.mock(com.original.security.event.AuditEventPublisher.class);
+        }
     }
 
     /**

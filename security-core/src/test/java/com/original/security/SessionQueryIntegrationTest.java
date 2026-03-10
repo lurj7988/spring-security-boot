@@ -95,8 +95,13 @@ public class SessionQueryIntegrationTest {
         }
 
         @Bean
-        public FrameAccessDeniedHandler accessDeniedHandler(ObjectMapper objectMapper, ApplicationEventPublisher publisher) {
+        public FrameAccessDeniedHandler accessDeniedHandler(ObjectMapper objectMapper, com.original.security.event.AuditEventPublisher publisher) {
             return new FrameAccessDeniedHandler(objectMapper, publisher);
+        }
+
+        @Bean
+        public com.original.security.event.AuditEventPublisher auditEventPublisher(ApplicationEventPublisher publisher) {
+            return new com.original.security.event.SpringAuditEventPublisher(publisher);
         }
 
         @Bean
