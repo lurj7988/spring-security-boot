@@ -319,8 +319,8 @@ class SecurityMetricsTest {
 
     @Test
     void testRecordAuthenticationSuccess_ValidSpecialChars_Preserved() {
-        // 测试合法的特殊字符
-        String validTag = "auth-type.auth_type:j-w";
+        // 测试合法的特殊字符（包括斜杠）
+        String validTag = "auth-type.auth_type:j-w/oauth2";
         securityMetrics.recordAuthenticationSuccess(validTag);
 
         Counter counter = meterRegistry.find(METRIC_SUCCESS).counter();
@@ -409,5 +409,106 @@ class SecurityMetricsTest {
             noOpMetrics.recordAuthenticationDuration("test", 1000L);
             noOpMetrics.recordAuthenticationDuration("test", 1000L, TimeUnit.MILLISECONDS);
         });
+    }
+
+    // ==================== 新增测试：isMetricsEnabled 方法 ====================
+
+    @Test
+    void testIsMetricsEnabled_ReturnsCorrectValue() {
+        // 测试带 MeterRegistry 的情况
+        assertTrue(securityMetrics.isMetricsEnabled(), "isMetricsEnabled() should return true when MeterRegistry is provided");
+
+        // 测试不带 MeterRegistry 的情况
+        SecurityMetrics metricsWithoutRegistry = new SecurityMetrics(null, properties);
+        assertFalse(metricsWithoutRegistry.isMetricsEnabled(), "isMetricsEnabled() should return false when MeterRegistry is null");
+    }
+
+    @Test
+    void testIsMetricsEnabled_MultipleCallsConsistency() {
+        // 多次调用应返回相同的值
+        boolean initialValue = securityMetrics.isMetricsEnabled();
+        for (int i = 0; i < 10; i++) {
+            assertEquals(initialValue, securityMetrics.isMetricsEnabled(),
+                "isMetricsEnabled() should return consistent value across multiple calls");
+        }
+    }
+
+    @Test
+    void testIsMetricsEnabled_AfterRecording() {
+        // 在记录 metrics 后再次检查
+        securityMetrics.recordAuthenticationSuccess("test");
+        assertTrue(securityMetrics.isMetricsEnabled(),
+            "isMetricsEnabled() should return true after recording metrics");
+
+        securityMetrics.recordAuthenticationFailure("test", "reason");
+        assertTrue(securityMetrics.isMetricsEnabled(),
+            "isMetricsEnabled() should return true after recording failures");
+
+        securityMetrics.recordAuthenticationDuration("test", 1000L);
+        assertTrue(securityMetrics.isMetricsEnabled(),
+            "isMetricsEnabled() should return true after recording duration");
+    }
+
+    // ==================== 新增测试：null MeterRegistry 边界情况 ====================
+
+    @Test
+    void testSecurityMetrics_WithNullMeterRegistryAndNullProperties() {
+        // 测试 MeterRegistry 和 Properties 都为 null 的情况
+        SecurityMetrics metrics = new SecurityMetrics(null, null);
+
+        // 验证不会抛出异常
+        assertDoesNotThrow(() -> {
+            metrics.recordAuthenticationSuccess("test");
+            metrics.recordAuthenticationFailure("test", "reason");
+            metrics.recordAuthenticationDuration("test", 1000L);
+            metrics.recordAuthenticationDuration("test", 1000L, TimeUnit.MILLISECONDS);
+        });
+
+        // 验证 isMetricsEnabled() 返回 false
+        assertFalse(metrics.isMetricsEnabled(),
+            "isMetricsEnabled() should return false when both MeterRegistry and Properties are null");
+    }
+
+    @Test
+    void testSecurityMetrics_WithNullMeterRegistry_LargeNumberOfOperations() {
+        SecurityMetrics noOpMetrics = new SecurityMetrics(null, properties);
+
+        // 执行大量操作，确保不会内存泄漏或性能问题
+        assertDoesNotThrow(() -> {
+            for (int i = 0; i < 1000; i++) {
+                noOpMetrics.recordAuthenticationSuccess("test" + i);
+                noOpMetrics.recordAuthenticationFailure("test" + i, "reason" + i);
+                noOpMetrics.recordAuthenticationDuration("test" + i, 1000L + i);
+            }
+        }, "Large number of operations should not throw exception");
+
+        // 验证 isMetricsEnabled() 仍然返回 false
+        assertFalse(noOpMetrics.isMetricsEnabled(),
+            "isMetricsEnabled() should return false even after many operations");
+    }
+
+    @Test
+    void testSecurityMetrics_WithNullMeterRegistry_CombinedOperations() {
+        SecurityMetrics noOpMetrics = new SecurityMetrics(null, properties);
+
+        // 测试混合操作
+        assertDoesNotThrow(() -> {
+            // 认证成功
+            noOpMetrics.recordAuthenticationSuccess("username-password");
+            noOpMetrics.recordAuthenticationSuccess("jwt");
+
+            // 认证失败
+            noOpMetrics.recordAuthenticationFailure("username-password", "BadCredentialsException");
+            noOpMetrics.recordAuthenticationFailure("oauth2", "AccessDeniedException");
+
+            // 认证耗时 - 不同时间单位
+            noOpMetrics.recordAuthenticationDuration("jwt", 1000L);
+            noOpMetrics.recordAuthenticationDuration("oauth2", 2000L, TimeUnit.MILLISECONDS);
+            noOpMetrics.recordAuthenticationDuration("api-key", 3000L, TimeUnit.NANOSECONDS);
+        }, "Combined operations should not throw exception");
+
+        // 验证 isMetricsEnabled() 返回 false
+        assertFalse(noOpMetrics.isMetricsEnabled(),
+            "isMetricsEnabled() should return false after combined operations");
     }
 }

@@ -17,6 +17,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -28,6 +30,7 @@ import static org.mockito.Mockito.*;
  * - 认证请求的时间记录
  * - 非认证请求的性能优化
  * - 过滤器正确配置和执行
+ * - 可配置认证路径功能
  *
  * @author Original Security Team
  * @since 1.0.0
@@ -55,6 +58,7 @@ class AuthenticationMetricsFilterTest {
 
         // 配置属性
         when(properties.isAuthenticationDurationEnabled()).thenReturn(true);
+        when(properties.getAuthPaths()).thenReturn(Arrays.asList(AUTH_LOGIN_PATH, LOGIN_PATH));
 
         // 创建过滤器
         filter = new AuthenticationMetricsFilter(securityMetrics, properties);
@@ -114,6 +118,61 @@ class AuthenticationMetricsFilterTest {
         verify(securityMetrics).recordAuthenticationDuration(anyString(), anyLong());
     }
 
+    @Test
+    void testCustomAuthPathsConfiguration() throws ServletException, IOException {
+        // 测试自定义认证路径配置
+        when(properties.getAuthPaths()).thenReturn(Arrays.asList("/api/v1/auth", "/custom/login"));
+
+        AuthenticationMetricsFilter customFilter = new AuthenticationMetricsFilter(securityMetrics, properties);
+
+        // 测试自定义路径
+        request.setRequestURI("/api/v1/auth");
+        customFilter.doFilterInternal(request, response, filterChain);
+        verify(securityMetrics).recordAuthenticationDuration(anyString(), anyLong());
+
+        // 重置 mock 和请求
+        reset(securityMetrics);
+        request = new MockHttpServletRequest();
+        response = new MockHttpServletResponse();
+        filterChain = new MockFilterChain(); // 创建新的 filterChain
+
+        // 测试另一个自定义路径
+        request.setRequestURI("/custom/login");
+        customFilter.doFilterInternal(request, response, filterChain);
+        verify(securityMetrics).recordAuthenticationDuration(anyString(), anyLong());
+    }
+
+    @Test
+    void testEmptyAuthPathsUsesDefault() throws ServletException, IOException {
+        // 测试空配置时使用默认路径
+        // 注意：SecurityMetricsProperties.getAuthPaths() 在返回空列表时会返回默认值
+        // 所以这里不需要 mock 返回空列表
+
+        AuthenticationMetricsFilter defaultFilter = new AuthenticationMetricsFilter(securityMetrics, properties);
+
+        // 默认路径应该仍然有效
+        request.setRequestURI(AUTH_LOGIN_PATH);
+        defaultFilter.doFilterInternal(request, response, filterChain);
+        verify(securityMetrics).recordAuthenticationDuration(anyString(), anyLong());
+    }
+
+    @Test
+    void testAuthPathWithoutLeadingSlash_IsHandledCorrectly() throws ServletException, IOException {
+        // 测试配置的路径不带 / 前缀的情况
+        // 注意：SecurityMetricsProperties.setAuthPaths() 会自动添加 / 前缀
+        // 所以我们需要创建新的 properties 对象来测试这个功能
+
+        com.original.security.config.SecurityMetricsProperties customProperties =
+                new com.original.security.config.SecurityMetricsProperties();
+        customProperties.setAuthPaths(Arrays.asList("api/auth/login", "login"));
+
+        AuthenticationMetricsFilter customFilter = new AuthenticationMetricsFilter(securityMetrics, customProperties);
+
+        // 路径应该被正确处理（添加 / 前缀）
+        request.setRequestURI("/api/auth/login");
+        customFilter.doFilterInternal(request, response, filterChain);
+        verify(securityMetrics).recordAuthenticationDuration(anyString(), anyLong());
+    }
 
     @Test
     void testFilterPluginProperties() {

@@ -205,9 +205,12 @@ public class SecurityMetrics {
      * 验证标签格式是否有效。
      * <p>
      * 有效格式：
-     * - 只包含字母、数字、下划线(_)、短横线(-)、点(.)和冒号(:)
+     * - 标签键：字母开头，只包含字母、数字、下划线
+     * - 标签值：包含字母、数字、下划线、短横线(-)、点(.)、冒号(:)和斜杠(/)
      * - 不能以点开头或结尾
      * - 长度 1-255 字符
+     *
+     * 参考：Micrometer 和 Prometheus 的标签规范
      *
      * @param value 标签值
      * @return 如果格式有效返回 true
@@ -227,8 +230,10 @@ public class SecurityMetrics {
             return false;
         }
 
-        // 检查字符集：只允许字母、数字、下划线、短横线、点和冒号
-        // 使用更严格的正则表达式，确保每个字符都符合要求
-        return value.matches("^[a-zA-Z0-9_\\-:.]+$");
+        // 检查字符集：允许字母、数字、下划线、短横线、点、冒号和斜杠
+        // 这是更符合实际使用场景的正则表达式，支持常见的认证类型名称
+        // 例如：username-password, jwt, oauth2, api-key, sms-code 等
+        // 短横线放在字符类末尾以避免范围歧义
+        return value.matches("^[a-zA-Z0-9_:./-]+$");
     }
 }

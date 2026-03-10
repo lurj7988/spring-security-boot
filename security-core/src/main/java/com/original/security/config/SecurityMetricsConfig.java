@@ -60,15 +60,17 @@ public class SecurityMetricsConfig {
     }
 
     /**
-     * 创建无 MeterRegistry 时的 SecurityMetrics Bean。
+     * 创建无 MeterRegistry 时的 SecurityMetrics Bean (no-op 实现)。
      * <p>
      * 当 Actuator 未启用时提供空实现。
+     * 此 Bean 方法不会与 securityMetrics() 冲突，因为 @ConditionalOnMissingBean(MeterRegistry.class)
+     * 确保仅在 MeterRegistry 不存在时才调用此方法。
      *
      * @param properties 安全 Metrics 配置属性
-     * @return SecurityMetrics 实例（不记录 metrics）
+     * @return SecurityMetrics 实例（不记录 metrics，所有操作都是 no-op）
      */
     @Bean
-    @ConditionalOnMissingBean({SecurityMetrics.class, MeterRegistry.class})
+    @ConditionalOnMissingBean(MeterRegistry.class)
     public SecurityMetrics securityMetricsNoOp(SecurityMetricsProperties properties) {
         log.warn("SecurityMetricsConfig: MeterRegistry not available, creating no-op SecurityMetrics");
         return new SecurityMetrics(null, properties);

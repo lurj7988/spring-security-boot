@@ -14,6 +14,7 @@ import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -34,17 +35,14 @@ public class AuthenticationMetricsFilter extends OncePerRequestFilter implements
 
     private static final String START_TIME_ATTR = "authentication.startTime";
 
-    /**
-     * 默认认证路径模式
-     */
-    private static final String[] DEFAULT_AUTH_PATHS = {"/api/auth/login", "/login"};
-
     private final SecurityMetrics securityMetrics;
     private final SecurityMetricsProperties properties;
+    private final List<String> authPaths;
 
     public AuthenticationMetricsFilter(SecurityMetrics securityMetrics, SecurityMetricsProperties properties) {
         this.securityMetrics = securityMetrics;
         this.properties = properties;
+        this.authPaths = properties.getAuthPaths();
     }
 
     @Override
@@ -101,7 +99,7 @@ public class AuthenticationMetricsFilter extends OncePerRequestFilter implements
             uri = uri.substring(contextPath.length());
         }
 
-        for (String path : DEFAULT_AUTH_PATHS) {
+        for (String path : authPaths) {
             if (uri.equals(path) || uri.startsWith(path + "/")) {
                 return true;
             }
