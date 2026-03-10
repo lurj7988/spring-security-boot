@@ -16,6 +16,7 @@ import java.io.IOException;
 import org.springframework.beans.factory.ObjectProvider;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for {@link FrameAuthenticationSuccessHandler}.
@@ -30,15 +31,17 @@ public class FrameAuthenticationSuccessHandlerTest {
     private ObjectMapper objectMapper;
     private ObjectProvider<com.original.security.util.JwtUtils> jwtUtilsProvider;
     private com.original.security.util.JwtUtils jwtUtils;
+    private com.original.security.event.AuditEventPublisher auditEventPublisher;
 
     @BeforeEach
     @SuppressWarnings("unchecked")
     public void setUp() {
         objectMapper = new ObjectMapper();
-        jwtUtilsProvider = org.mockito.Mockito.mock(ObjectProvider.class);
-        jwtUtils = org.mockito.Mockito.mock(com.original.security.util.JwtUtils.class);
-        org.mockito.Mockito.when(jwtUtilsProvider.getIfAvailable()).thenReturn(jwtUtils);
-        successHandler = new FrameAuthenticationSuccessHandler(objectMapper, jwtUtilsProvider);
+        jwtUtilsProvider = mock(ObjectProvider.class);
+        jwtUtils = mock(com.original.security.util.JwtUtils.class);
+        auditEventPublisher = mock(com.original.security.event.AuditEventPublisher.class);
+        when(jwtUtilsProvider.getIfAvailable()).thenReturn(jwtUtils);
+        successHandler = new FrameAuthenticationSuccessHandler(objectMapper, jwtUtilsProvider, auditEventPublisher);
     }
 
     @Test
@@ -47,7 +50,7 @@ public class FrameAuthenticationSuccessHandlerTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         Authentication auth = new UsernamePasswordAuthenticationToken("admin", "pass", java.util.Collections.emptyList());
 
-        org.mockito.Mockito.when(jwtUtils.generateToken(org.mockito.ArgumentMatchers.eq("admin"), org.mockito.ArgumentMatchers.any())).thenReturn("mocked.jwt.token");
+        when(jwtUtils.generateToken(eq("admin"), any())).thenReturn("mocked.jwt.token");
 
         successHandler.onAuthenticationSuccess(request, response, auth);
 
@@ -60,5 +63,53 @@ public class FrameAuthenticationSuccessHandlerTest {
         assertTrue(jsonNode.get("data").has("user"));
         assertEquals("admin", jsonNode.get("data").get("user").asText());
         assertEquals("mocked.jwt.token", jsonNode.get("data").get("token").asText());
+    }
+
+    @Test
+    public void testOnAuthenticationSuccess_WithAuthMethodAttribute_PublishesEvent() throws IOException, ServletException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setAttribute("authMethod", "jwt");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        Authentication auth = new UsernamePasswordAuthenticationToken("testuser", "pass", java.util.Collections.emptyList());
+
+        when(jwtUtils.generateToken(eq("testuser"), any())).thenReturn("token");
+
+        successHandler.onAuthenticationSuccess(request, response, auth);
+
+        // 验证事件发布器被调用
+        verify(auditEventPublisher, times(1)).publish(any(com.original.security.event.AuthenticationSuccessEvent.class));
+    }
+
+    @Test
+    public void testOnAuthenticationSuccess_EventPublisherThrowsException_DoesNotFail() throws IOException, ServletException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        Authentication auth = new UsernamePasswordAuthenticationToken("admin", "pass", java.util.Collections.emptyList());
+
+        // 模拟事件发布器抛出异常
+        doThrow(new RuntimeException("Event publisher failed")).when(auditEventPublisher).publish(any());
+
+        // 这不应该抛出异常
+        successHandler.onAuthenticationSuccess(request, response, auth);
+
+        // 验证响应仍然成功
+        assertEquals(200, response.getStatus());
+    }
+
+    @Test
+    public void testOnAuthenticationSuccess_NoJwtUtils_DoesNotIncludeToken() throws IOException, ServletException {
+        // 重新创建不带 jwtUtils 的 handler
+        successHandler = new FrameAuthenticationSuccessHandler(objectMapper, jwtUtilsProvider, auditEventPublisher);
+        when(jwtUtilsProvider.getIfAvailable()).thenReturn(null);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        Authentication auth = new UsernamePasswordAuthenticationToken("admin", "pass", java.util.Collections.emptyList());
+
+        successHandler.onAuthenticationSuccess(request, response, auth);
+
+        JsonNode jsonNode = objectMapper.readTree(response.getContentAsByteArray());
+        assertTrue(jsonNode.has("data"));
+        assertFalse(jsonNode.get("data").has("token"));
     }
 }

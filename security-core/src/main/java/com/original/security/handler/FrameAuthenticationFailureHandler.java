@@ -17,13 +17,20 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
+import com.original.security.event.AuditEventPublisher;
+import com.original.security.event.AuthenticationFailureEvent;
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * 自定义认证失败处理器
  * <p>
  * 统一处理 Spring Security 抛出的 AuthenticationException 并通过框架标准的 Response 返回。
+ * 同时发布 {@link AuthenticationFailureEvent} 审计事件用于安全监控。
  * </p>
  *
  * @author Original Security Team
+ * @since 1.0.0
  */
 @Component
 public class FrameAuthenticationFailureHandler implements AuthenticationFailureHandler {
@@ -31,17 +38,19 @@ public class FrameAuthenticationFailureHandler implements AuthenticationFailureH
     private static final Logger log = LoggerFactory.getLogger(FrameAuthenticationFailureHandler.class);
     
     private final ObjectMapper objectMapper;
+    private final AuditEventPublisher auditEventPublisher;
 
-    public FrameAuthenticationFailureHandler(ObjectMapper objectMapper) {
+    public FrameAuthenticationFailureHandler(ObjectMapper objectMapper, AuditEventPublisher auditEventPublisher) {
         this.objectMapper = objectMapper;
+        this.auditEventPublisher = auditEventPublisher;
     }
 
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) throws IOException, ServletException {
         log.warn("用户认证失败: {}", exception.getMessage());
 
-        // TODO: Publish audit event when audit module is available (FR15)
-        // auditEventPublisher.publish(AuthenticationAuditEvent.failed(username, exception));
+        // 发布认证失败审计事件
+        publishAuditFailure(request, exception);
 
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
@@ -60,5 +69,30 @@ public class FrameAuthenticationFailureHandler implements AuthenticationFailureH
                 .build();
         
         objectMapper.writeValue(response.getWriter(), errorResponse);
+    }
+
+    private void publishAuditFailure(HttpServletRequest request, AuthenticationException exception) {
+        try {
+            String username = request.getParameter("username");
+            if (username == null) {
+                username = "unknown";
+            }
+
+            Map<String, Object> details = new HashMap<>();
+            details.put("ipAddress", request.getRemoteAddr());
+            details.put("userAgent", request.getHeader("User-Agent"));
+            details.put("exceptionType", exception.getClass().getName());
+
+            AuthenticationFailureEvent event = new AuthenticationFailureEvent(
+                this,
+                username,
+                exception.getMessage(),
+                details
+            );
+            auditEventPublisher.publish(event);
+        } catch (Exception e) {
+            // 事件发布失败不应影响正常错误响应
+            log.warn("Failed to publish authentication failure audit event: {}", e.getMessage());
+        }
     }
 }

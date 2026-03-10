@@ -20,6 +20,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
+import com.original.security.event.AuditEventPublisher;
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * 统一处理 Spring Security 抛出的 AccessDeniedException (包括 CsrfException)
  * 并通过框架标准的 Response 返回。
@@ -35,11 +39,11 @@ public class FrameAccessDeniedHandler implements AccessDeniedHandler {
     private static final Logger log = LoggerFactory.getLogger(FrameAccessDeniedHandler.class);
 
     private final ObjectMapper objectMapper;
-    private final ApplicationEventPublisher eventPublisher;
+    private final AuditEventPublisher auditEventPublisher;
 
-    public FrameAccessDeniedHandler(ObjectMapper objectMapper, ApplicationEventPublisher eventPublisher) {
+    public FrameAccessDeniedHandler(ObjectMapper objectMapper, AuditEventPublisher auditEventPublisher) {
         this.objectMapper = objectMapper;
-        this.eventPublisher = eventPublisher;
+        this.auditEventPublisher = auditEventPublisher;
     }
 
     @Override
@@ -50,7 +54,7 @@ public class FrameAccessDeniedHandler implements AccessDeniedHandler {
         log.warn("访问被拒绝: URI={}, Reason={}", requestUri, errorMessage);
 
         // 发布授权失败审计事件
-        publishAuthorizationFailureEvent(requestUri, errorMessage);
+        publishAuthorizationFailureEvent(request, requestUri, errorMessage);
 
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
@@ -72,23 +76,30 @@ public class FrameAccessDeniedHandler implements AccessDeniedHandler {
     /**
      * 发布授权失败审计事件。
      *
+     * @param request HttpServletRequest
      * @param resource 被访问的资源路径
      * @param denialReason 拒绝原因
      */
-    private void publishAuthorizationFailureEvent(String resource, String denialReason) {
+    private void publishAuthorizationFailureEvent(HttpServletRequest request, String resource, String denialReason) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            String requiredAuthority = extractRequiredAuthority(denialReason);
+            String username = AuthorizationFailureEvent.extractUsername(authentication);
+            String requiredPermission = extractRequiredAuthority(denialReason);
+
+            Map<String, Object> details = new HashMap<>();
+            details.put("ipAddress", request.getRemoteAddr());
+            details.put("userAgent", request.getHeader("User-Agent"));
+            details.put("method", request.getMethod());
 
             AuthorizationFailureEvent event = new AuthorizationFailureEvent(
                     this,
-                    authentication,
+                    username,
                     resource,
-                    requiredAuthority,
-                    denialReason
+                    requiredPermission,
+                    details
             );
 
-            eventPublisher.publishEvent(event);
+            auditEventPublisher.publish(event);
             log.debug("Published authorization failure event: {}", event);
         } catch (Exception e) {
             // 事件发布失败不应影响正常响应

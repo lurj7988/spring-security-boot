@@ -85,13 +85,13 @@ public class SecurityAutoConfiguration {
     }
 
     /**
-     * 注册授权审计监听器。
+     * 注册审计事件监听器。
      */
     @Bean
-    @ConditionalOnMissingBean(com.original.security.event.AuthorizationAuditListener.class)
-    public com.original.security.event.AuthorizationAuditListener authorizationAuditListener() {
-        log.info("Security auto-configuration: Registering AuthorizationAuditListener");
-        return new com.original.security.event.AuthorizationAuditListener();
+    @ConditionalOnMissingBean(com.original.security.observability.AuditEventListener.class)
+    public com.original.security.observability.AuditEventListener auditEventListener() {
+        log.info("Security auto-configuration: Registering AuditEventListener");
+        return new com.original.security.observability.AuditEventListener();
     }
 
     /**
