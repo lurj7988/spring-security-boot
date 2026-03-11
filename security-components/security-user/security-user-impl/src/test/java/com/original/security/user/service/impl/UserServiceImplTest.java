@@ -1,15 +1,13 @@
 package com.original.security.user.service.impl;
 
+import com.original.security.user.api.dto.request.PasswordChangeRequest;
 import com.original.security.user.api.dto.request.UserCreateRequest;
 import com.original.security.user.api.dto.response.PageDTO;
 import com.original.security.user.api.dto.response.UserDTO;
 import com.original.security.user.config.UserProperties;
 import com.original.security.user.entity.Role;
 import com.original.security.user.entity.User;
-import com.original.security.user.exception.EmailAlreadyExistsException;
-import com.original.security.user.exception.UserAlreadyExistsException;
-import com.original.security.user.exception.UserDisabledException;
-import com.original.security.user.exception.UserNotFoundException;
+import com.original.security.user.exception.*;
 import com.original.security.user.event.UserCreatedEvent;
 import com.original.security.user.notification.NotificationService;
 import com.original.security.user.repository.RoleRepository;
@@ -23,14 +21,19 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Optional;
 
@@ -62,11 +65,9 @@ class UserServiceImplTest {
 
     private UserServiceImpl userService;
 
-    private UserProperties userProperties;
-
     @BeforeEach
     void setUp() {
-        userProperties = new UserProperties();
+        UserProperties userProperties = new UserProperties();
         SessionRegistry mockSessionRegistry = mock(SessionRegistry.class);
         NotificationService mockNotificationService = mock(NotificationService.class);
 
@@ -142,7 +143,7 @@ class UserServiceImplTest {
             return role;
         });
         when(userRepository.save(any(User.class)))
-            .thenThrow(new org.springframework.dao.DataIntegrityViolationException("Duplicate entry for key 'UK_username'"));
+                .thenThrow(new DataIntegrityViolationException("Duplicate entry for key 'UK_username'"));
 
         // When & Then
         UserAlreadyExistsException exception = assertThrows(
@@ -165,7 +166,7 @@ class UserServiceImplTest {
             return role;
         });
         when(userRepository.save(any(User.class)))
-            .thenThrow(new org.springframework.dao.DataIntegrityViolationException("Duplicate entry for key 'UK_email'"));
+                .thenThrow(new DataIntegrityViolationException("Duplicate entry for key 'UK_email'"));
 
         // When & Then
         EmailAlreadyExistsException exception = assertThrows(
@@ -257,7 +258,7 @@ class UserServiceImplTest {
         // Given
         User user1 = new User(1L, "alice_test", "pass1", "alice@test.com", true, LocalDateTime.now(), new HashSet<>());
         User user2 = new User(2L, "bob_test", "pass2", "bob@test.com", true, LocalDateTime.now(), new HashSet<>());
-        User user3 = new User(3L, "charlie_other", "pass3", "charlie@test.com", true, LocalDateTime.now(), new HashSet<>());
+        //User user3 = new User(3L, "charlie_other", "pass3", "charlie@test.com", true, LocalDateTime.now(), new HashSet<>());
 
         when(userRepository.findByUsernameContainingAndEnabled(eq("test"), eq(null), any(PageRequest.class)))
                 .thenReturn(new PageImpl<>(
@@ -279,11 +280,11 @@ class UserServiceImplTest {
     void testListUsersWithFilters_EnabledFilter_ReturnsFilteredUsers() {
         // Given
         User enabledUser = new User(1L, "enabled_user", "pass1", "enabled@test.com", true, LocalDateTime.now(), new HashSet<>());
-        User disabledUser = new User(2L, "disabled_user", "pass2", "disabled@test.com", false, LocalDateTime.now(), new HashSet<>());
+        //User disabledUser = new User(2L, "disabled_user", "pass2", "disabled@test.com", false, LocalDateTime.now(), new HashSet<>());
 
         when(userRepository.findByUsernameContainingAndEnabled(eq(null), eq(true), any(PageRequest.class)))
                 .thenReturn(new PageImpl<>(
-                        Arrays.asList(enabledUser),
+                        Collections.singletonList(enabledUser),
                         PageRequest.of(0, 10),
                         1
                 ));
@@ -294,18 +295,18 @@ class UserServiceImplTest {
         // Then
         assertNotNull(result);
         assertEquals(1, result.getContent().size());
-        assertEquals(true, result.getContent().get(0).isEnabled());
+        assertTrue(result.getContent().get(0).isEnabled());
     }
 
     @Test
     void testListUsersWithFilters_DisabledFilter_ReturnsFilteredUsers() {
         // Given
-        User enabledUser = new User(1L, "enabled_user", "pass1", "enabled@test.com", true, LocalDateTime.now(), new HashSet<>());
+        // User enabledUser = new User(1L, "enabled_user", "pass1", "enabled@test.com", true, LocalDateTime.now(), new HashSet<>());
         User disabledUser = new User(2L, "disabled_user", "pass2", "disabled@test.com", false, LocalDateTime.now(), new HashSet<>());
 
         when(userRepository.findByUsernameContainingAndEnabled(eq(null), eq(false), any(PageRequest.class)))
                 .thenReturn(new PageImpl<>(
-                        Arrays.asList(disabledUser),
+                        Collections.singletonList(disabledUser),
                         PageRequest.of(0, 10),
                         1
                 ));
@@ -316,7 +317,7 @@ class UserServiceImplTest {
         // Then
         assertNotNull(result);
         assertEquals(1, result.getContent().size());
-        assertEquals(false, result.getContent().get(0).isEnabled());
+        assertFalse(result.getContent().get(0).isEnabled());
     }
 
     @Test
@@ -326,7 +327,7 @@ class UserServiceImplTest {
 
         when(userRepository.findByUsernameContainingAndEnabled(eq("alice"), eq(true), any(PageRequest.class)))
                 .thenReturn(new PageImpl<>(
-                        Arrays.asList(matchingUser),
+                        Collections.singletonList(matchingUser),
                         PageRequest.of(0, 10),
                         1
                 ));
@@ -369,7 +370,7 @@ class UserServiceImplTest {
         User user1 = new User(1L, "user1", "pass1", "email1@example.com", true, LocalDateTime.now(), new HashSet<>());
         User user2 = new User(2L, "user2", "pass2", "email2@example.com", true, LocalDateTime.now(), new HashSet<>());
 
-        when(userRepository.findByUsernameContainingAndEnabled(eq(null), eq(null), any(PageRequest.class)))
+        when(userRepository.findByUsernameContainingAndEnabled(eq(null), eq(null), eq(PageRequest.of(0, 10))))
                 .thenReturn(new PageImpl<>(
                         Arrays.asList(user1, user2),
                         PageRequest.of(0, 10),
@@ -380,7 +381,14 @@ class UserServiceImplTest {
         PageDTO<UserDTO> result = userService.listUsers(0, 10, "", null);
 
         // Then - 应该当作null来处理（即不过滤用户名）
-        verify(userRepository).findByUsernameContainingAndEnabled(eq(null), eq(null), any(PageRequest.class));
+        verify(userRepository).findByUsernameContainingAndEnabled(eq(null), eq(null), eq(PageRequest.of(0, 10)));
+
+        // Assertions for the result
+        assertNotNull(result);
+        assertEquals(2, result.getTotalElements());
+        assertEquals(2, result.getContent().size());
+        assertEquals("user1", result.getContent().get(0).getUsername());
+        assertEquals("user2", result.getContent().get(1).getUsername());
     }
 
     @Test
@@ -444,7 +452,7 @@ class UserServiceImplTest {
     void testListUsers_NegativePage_ReturnsFirstPage() {
         // Given
         when(userRepository.findByUsernameContainingAndEnabled(isNull(), isNull(), any(PageRequest.class)))
-                .thenReturn(new PageImpl<>(Arrays.asList(), PageRequest.of(0, 10), 0));
+                .thenReturn(new PageImpl<>(Collections.emptyList(), PageRequest.of(0, 10), 0));
 
         // When - 传入负数页码
         PageDTO<UserDTO> result = userService.listUsers(-1, 10, null, null);
@@ -461,7 +469,7 @@ class UserServiceImplTest {
     void testListUsers_ExcessiveSize_UsesDefaultSize() {
         // Given
         when(userRepository.findByUsernameContainingAndEnabled(isNull(), isNull(), any(PageRequest.class)))
-                .thenReturn(new PageImpl<>(Arrays.asList(), PageRequest.of(0, 10), 0));
+                .thenReturn(new PageImpl<>(Collections.emptyList(), PageRequest.of(0, 10), 0));
 
         // When - 传入过大的 size
         PageDTO<UserDTO> result = userService.listUsers(0, 1000, null, null);
@@ -474,100 +482,96 @@ class UserServiceImplTest {
     @Test
     void testChangePassword_ValidInput_UpdatesPassword() {
         // Given
-        com.original.security.user.api.dto.request.PasswordChangeRequest request = new com.original.security.user.api.dto.request.PasswordChangeRequest();
+        PasswordChangeRequest request = new PasswordChangeRequest();
         request.setOldPassword("oldPass");
         request.setNewPassword("newPass123!");
-        
+
         User user = new User(1L, "testuser", "encoded_old", "test@example.com", true, LocalDateTime.now(), new HashSet<>());
-        
-        org.springframework.security.core.Authentication auth = mock(org.springframework.security.core.Authentication.class);
-        org.springframework.security.core.context.SecurityContext context = mock(org.springframework.security.core.context.SecurityContext.class);
+
+        Authentication auth = mock(Authentication.class);
+        SecurityContext context = mock(SecurityContext.class);
         when(context.getAuthentication()).thenReturn(auth);
         when(auth.isAuthenticated()).thenReturn(true);
         when(auth.getName()).thenReturn("testuser");
-        org.springframework.security.core.context.SecurityContextHolder.setContext(context);
-        
+        SecurityContextHolder.setContext(context);
+
         when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("oldPass", "encoded_old")).thenReturn(true);
         when(passwordEncoder.encode("newPass123!")).thenReturn("encoded_new");
-        
+
         // When
         userService.changePassword(request);
-        
+
         // Then
         assertEquals("encoded_new", user.getPassword());
         verify(userRepository).save(user);
-        
+
         // Cleanup
-        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        SecurityContextHolder.clearContext();
     }
 
     @Test
     void testChangePassword_InvalidOldPassword_ThrowsException() {
         // Given
-        com.original.security.user.api.dto.request.PasswordChangeRequest request = new com.original.security.user.api.dto.request.PasswordChangeRequest();
+        PasswordChangeRequest request = new PasswordChangeRequest();
         request.setOldPassword("wrongOldPass");
         request.setNewPassword("newPass123!");
-        
+
         User user = new User(1L, "testuser", "encoded_old", "test@example.com", true, LocalDateTime.now(), new HashSet<>());
-        
-        org.springframework.security.core.Authentication auth = mock(org.springframework.security.core.Authentication.class);
-        org.springframework.security.core.context.SecurityContext context = mock(org.springframework.security.core.context.SecurityContext.class);
+
+        Authentication auth = mock(Authentication.class);
+        SecurityContext context = mock(SecurityContext.class);
         when(context.getAuthentication()).thenReturn(auth);
         when(auth.isAuthenticated()).thenReturn(true);
         when(auth.getName()).thenReturn("testuser");
-        org.springframework.security.core.context.SecurityContextHolder.setContext(context);
-        
+        SecurityContextHolder.setContext(context);
+
         when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrongOldPass", "encoded_old")).thenReturn(false);
-        
+
         // When & Then
-        assertThrows(com.original.security.user.exception.InvalidPasswordException.class, () -> {
-            userService.changePassword(request);
-        });
-        
+        assertThrows(InvalidPasswordException.class, () -> userService.changePassword(request));
+
         verify(userRepository, never()).save(any(User.class));
-        
+
         // Cleanup
-        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        SecurityContextHolder.clearContext();
     }
 
     @Test
     void testChangePassword_InvalidComplexity_ThrowsException() {
         // Given
-        com.original.security.user.api.dto.request.PasswordChangeRequest request = new com.original.security.user.api.dto.request.PasswordChangeRequest();
+        PasswordChangeRequest request = new PasswordChangeRequest();
         request.setOldPassword("oldPass");
         request.setNewPassword("weak"); // Too short, no numbers/special chars
-        
+
         User user = new User(1L, "testuser", "encoded_old", "test@example.com", true, LocalDateTime.now(), new HashSet<>());
-        
-        org.springframework.security.core.Authentication auth = mock(org.springframework.security.core.Authentication.class);
-        org.springframework.security.core.context.SecurityContext context = mock(org.springframework.security.core.context.SecurityContext.class);
+
+        Authentication auth = mock(Authentication.class);
+        SecurityContext context = mock(SecurityContext.class);
         when(context.getAuthentication()).thenReturn(auth);
         when(auth.isAuthenticated()).thenReturn(true);
         when(auth.getName()).thenReturn("testuser");
-        org.springframework.security.core.context.SecurityContextHolder.setContext(context);
-        
+        SecurityContextHolder.setContext(context);
+
         when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("oldPass", "encoded_old")).thenReturn(true);
-        
+
         // When & Then
-        com.original.security.user.exception.PasswordPolicyViolationException exception = assertThrows(
-                com.original.security.user.exception.PasswordPolicyViolationException.class, () -> {
-            userService.changePassword(request);
-        });
+        PasswordPolicyViolationException exception = assertThrows(
+                PasswordPolicyViolationException.class, () -> userService.changePassword(request));
         assertTrue(exception.getMessage().contains("密码复杂度不足"));
-        
+
         verify(userRepository, never()).save(any(User.class));
-        
+
         // Cleanup
-        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        SecurityContextHolder.clearContext();
     }
 
     @Test
     void testResetPassword_ValidUserId_GeneratesAndSavesNewPassword() {
         // Given - 清除安全上下文以模拟管理员操作（无认证）
-        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        SecurityContextHolder.clearContext();
 
         User user = new User(1L, "testuser", "encoded_old", "test@example.com", true, LocalDateTime.now(), new HashSet<>());
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
@@ -583,6 +587,6 @@ class UserServiceImplTest {
         verify(userRepository).save(user);
 
         // Cleanup
-        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        SecurityContextHolder.clearContext();
     }
 }

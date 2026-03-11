@@ -2,10 +2,7 @@ package com.original.security.user.service.impl;
 
 import com.original.security.user.api.dto.request.PasswordChangeRequest;
 import com.original.security.user.config.UserProperties;
-import com.original.security.user.entity.Role;
 import com.original.security.user.entity.User;
-import com.original.security.user.exception.InvalidPasswordException;
-import com.original.security.user.exception.UserNotFoundException;
 import com.original.security.user.notification.NotificationService;
 import com.original.security.user.repository.RoleRepository;
 import com.original.security.user.repository.UserRepository;
@@ -137,7 +134,6 @@ class UserServiceSecurityContextTest {
     void testResetPassword_InvalidatesSessions() {
         // 准备测试数据
         Long userId = 1L;
-        String newPassword = "generatedPassword123!";
         User user = new User(userId, "testuser", "oldEncodedPassword", "test@example.com", true, null, Collections.emptySet());
 
         // 设置mock行为

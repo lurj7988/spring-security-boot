@@ -5,6 +5,7 @@ import com.original.security.user.entity.Role;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -31,6 +32,9 @@ class UserRepositoryTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private TestEntityManager entityManager;
 
     @Test
     void testUserRepositoryBasicOperations() {
@@ -103,18 +107,51 @@ class UserRepositoryTest {
     @Test
     void testFindByRoles_Name() {
         // 测试根据角色名称查找用户
-        // 注意：由于 Role 实体不在当前测试 scope，此测试需要依赖 Role 实体
-        // 如果 Role 类未正确配置，此测试可能失败
+        Role adminRole = new Role("ADMIN", "Administrator");
+        Role userRole = new Role("USER", "User");
+        
+        entityManager.persist(adminRole);
+        entityManager.persist(userRole);
 
-        // 保存角色
-        Role role1 = new Role("ADMIN", "Administrator");
-        Role role2 = new Role("USER", "User");
+        User adminUser = new User();
+        adminUser.setUsername("admin_test_roles");
+        adminUser.setPassword("pass");
+        adminUser.setEmail("admin_test_roles@example.com");
+        adminUser.setEnabled(true);
+        adminUser.addRole(adminRole);
+        
+        User normalUser = new User();
+        normalUser.setUsername("user_test_roles");
+        normalUser.setPassword("pass");
+        normalUser.setEmail("user_test_roles@example.com");
+        normalUser.setEnabled(true);
+        normalUser.addRole(userRole);
+        
+        User multiRoleUser = new User();
+        multiRoleUser.setUsername("super_test_roles");
+        multiRoleUser.setPassword("pass");
+        multiRoleUser.setEmail("super_test_roles@example.com");
+        multiRoleUser.setEnabled(true);
+        multiRoleUser.addRole(adminRole);
+        multiRoleUser.addRole(userRole);
 
-        // 由于 RoleRepository 未注入，跳过此测试
-        // 这个测试需要在一个更完整的集成测试中实现
-        // 暂时标记为跳过
-        org.junit.jupiter.api.Assumptions.assumeTrue(false,
-                "需要 RoleRepository 才能完整测试 findByRoles_Name() 方法");
+        entityManager.persist(adminUser);
+        entityManager.persist(normalUser);
+        entityManager.persist(multiRoleUser);
+        entityManager.flush();
+
+        java.util.List<User> adminUsers = userRepository.findByRoles_Name("ADMIN");
+        assertEquals(2, adminUsers.size());
+        assertTrue(adminUsers.stream().anyMatch(u -> u.getUsername().equals("admin_test_roles")));
+        assertTrue(adminUsers.stream().anyMatch(u -> u.getUsername().equals("super_test_roles")));
+
+        java.util.List<User> normalUsers = userRepository.findByRoles_Name("USER");
+        assertEquals(2, normalUsers.size());
+        assertTrue(normalUsers.stream().anyMatch(u -> u.getUsername().equals("user_test_roles")));
+        assertTrue(normalUsers.stream().anyMatch(u -> u.getUsername().equals("super_test_roles")));
+        
+        java.util.List<User> noUsers = userRepository.findByRoles_Name("GUEST");
+        assertEquals(0, noUsers.size());
     }
 
     @Test
@@ -324,12 +361,12 @@ class UserRepositoryTest {
     /**
      * 辅助方法：创建测试用户
      */
-    private User createTestUser(String username, String email, boolean enabled) {
+    private void createTestUser(String username, String email, boolean enabled) {
         User user = new User();
         user.setUsername(username);
         user.setEmail(email);
         user.setPassword("encoded_password");
         user.setEnabled(enabled);
-        return userRepository.save(user);
+        userRepository.save(user);
     }
 }
