@@ -1,0 +1,4 @@
+# Security Boot Auto Configuration
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+com.original.security.logging.config.SecurityLoggingAutoConfiguration,\
+com.original.security.logging.config.AsyncLoggingConfiguration
