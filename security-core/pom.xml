@@ -95,6 +95,42 @@
             <artifactId>micrometer-core</artifactId>
         </dependency>
 
+        <!-- ========== Distributed Tracing (Micrometer Tracing) ========== -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-brave</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.zipkin.reporter2</groupId>
+            <artifactId>zipkin-reporter-brave</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ========== Distributed Tracing Test Support ========== -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-test</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ========== Feign (Optional) ========== -->
+        <dependency>
+            <groupId>io.github.openfeign</groupId>
+            <artifactId>feign-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- ========== Test Support (Optional) ========== -->
         <!-- Test utilities for framework users - optional dependencies -->
         <dependency>

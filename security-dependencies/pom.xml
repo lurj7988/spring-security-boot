@@ -32,6 +32,11 @@
 
         <!-- ========== Observability ========== -->
         <micrometer.version>1.10.12</micrometer.version>
+        <micrometer-tracing.version>1.0.12</micrometer-tracing.version>
+        <zipkin-reporter.version>2.16.4</zipkin-reporter.version>
+
+        <!-- ========== Feign ========== -->
+        <feign.version>11.10</feign.version>
     </properties>
 
     <dependencyManagement>
@@ -89,6 +94,40 @@
                 <groupId>io.micrometer</groupId>
                 <artifactId>micrometer-core</artifactId>
                 <version>${micrometer.version}</version>
+            </dependency>
+
+            <!-- Micrometer Tracing (Distributed Tracing) -->
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-tracing</artifactId>
+                <version>${micrometer-tracing.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-tracing-bridge-brave</artifactId>
+                <version>${micrometer-tracing.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-tracing-bridge-otel</artifactId>
+                <version>${micrometer-tracing.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-tracing-test</artifactId>
+                <version>${micrometer-tracing.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.zipkin.reporter2</groupId>
+                <artifactId>zipkin-reporter-brave</artifactId>
+                <version>${zipkin-reporter.version}</version>
+            </dependency>
+
+            <!-- ========== Feign ========== -->
+            <dependency>
+                <groupId>io.github.openfeign</groupId>
+                <artifactId>feign-core</artifactId>
+                <version>${feign.version}</version>
             </dependency>
 
             <!-- ========== Project Modules ========== -->
