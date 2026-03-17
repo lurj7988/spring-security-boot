@@ -38,5 +38,6 @@ build/
 .claude/
 .gemini/
 .agent/
+.agents/
 _bmad/
 nul
