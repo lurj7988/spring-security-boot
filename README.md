@@ -9,6 +9,10 @@ Spring Security Boot 是一个基于 Spring Security 的增强框架，目标是
 - [API 参考文档](docs/api.md)
 - [测试支持工具文档](docs/testing-support.md)
 
+## 示例项目
+
+- [快速开始示例项目](examples/README.md) - 包含完整的前后端示例，展示如何使用框架
+
 ## 当前仓库结构
 
 这是一个 Maven 多模块框架仓库，而不是单一可直接运行的 demo 应用仓库。核心模块包括：
