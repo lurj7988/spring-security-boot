@@ -11,11 +11,10 @@
 
 ### 🧪 开发支持
 
+- [**API 参考文档**](api.md) - 所有 API 端点的详细说明和使用示例
 - [**测试支持工具文档**](testing-support.md) - 为安全逻辑添加测试支持
 
 ### 📋 计划中的文档
-
-- [API 参考文档](api-reference.md) - 了解默认端点与返回格式（开发中）
 - [快速开始示例项目](example-project.md) - 完整的示例工程（开发中）
 - [故障排查指南](troubleshooting-guide.md) - 常见问题解决方案（开发中）
 - [插件开发指南](plugin-development-guide.md) - 扩展框架功能（开发中）
@@ -28,6 +27,7 @@
 ├── README.md              ← 你在这里
 ├── quick-start.md         ← 🚀 从这里开始
 ├── configuration.md       ← ⚙️ 配置参考
+├── api.md                 ← 📖 API 参考
 └── testing-support.md     ← 🧪 测试支持
 ```
 
@@ -40,7 +40,8 @@
 ### 对于有经验的开发者
 1. 从 **[快速开始指南](quick-start.md)** 快速验证集成
 2. 直接跳转到 **[配置参考文档](configuration.md)** 进行高级配置
-3. 使用 **[测试支持工具](testing-support.md)** 为项目添加测试
+3. 查阅 **[API 参考文档](api.md)** 了解所有端点接口
+4. 使用 **[测试支持工具](testing-support.md)** 为项目添加测试
 
 ### 运维和架构师
 1. 快速浏览 **[快速开始指南](quick-start.md)** 了解框架能力
@@ -57,4 +58,4 @@
 
 ---
 
-**文档最后更新：** 2026-03-17
+**文档最后更新：** 2026-03-18

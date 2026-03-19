@@ -106,6 +106,12 @@ public class UserServiceImpl implements UserService {
             throw new PasswordPolicyViolationException("密码长度不能超过" + maxLength + "个字符");
         }
 
+        // 验证密码复杂度
+        if (request.getPassword() != null && !PASSWORD_COMPLEXITY_PATTERN.matcher(request.getPassword()).matches()) {
+            log.warn("用户创建失败，密码复杂度不足: username={}", request.getUsername());
+            throw new PasswordPolicyViolationException("密码复杂度不足：必须包含至少一个数字、一个字母和一个特殊字符，且长度应在8到50之间");
+        }
+
         // 创建用户实体
         User user = new User(
                 request.getUsername(),

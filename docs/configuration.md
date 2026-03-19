@@ -743,6 +743,7 @@ security.tracing.record-client-ip=false
 
 配置完成后，建议继续阅读以下文档：
 
+- [API 参考文档](api.md)：了解所有默认端点与返回格式
 - [快速开始文档](quick-start.md)：了解最小集成路径和快速验证方法
 - [测试支持工具文档](testing-support.md)：为安全逻辑添加测试支持
 

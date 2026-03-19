@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import org.springframework.security.web.authentication.RememberMeServices;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpServletRequestWrapper;
+import javax.validation.Valid;
 
 /**
  * 默认认证控制器。
@@ -86,7 +87,7 @@ public class AuthenticationController {
      * @return 认证响应，包含用户信息和 Token（如果可用）
      */
     @PostMapping("/login")
-    public Response<AuthResponse> login(@RequestBody LoginRequest loginRequest, HttpServletRequest request, HttpServletResponse response) {
+    public Response<AuthResponse> login(@Valid @RequestBody LoginRequest loginRequest, HttpServletRequest request, HttpServletResponse response) {
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword())

@@ -191,7 +191,7 @@ security.network.cors.allowed-origins=http://localhost:8080
 跑通最小路径后，建议继续看：
 
 - [配置参考文档](configuration.md)：了解所有配置项的详细说明和选项
-- 后续 API 参考文档：了解默认端点与返回格式
-- [测试支持工具文档](testing-support.md)：为你的安全逻辑添加测试
+- [API 参考文档](api.md)：了解所有默认端点与返回格式
+- [测试支持工具文档](testing-support.md)：为你的安全逻辑添加测试支持
 
 如果你当前目标只是”先确认框架可以启动并挂载安全能力”，到这里已经足够。

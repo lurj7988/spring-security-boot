@@ -6,6 +6,7 @@ Spring Security Boot 是一个基于 Spring Security 的增强框架，目标是
 
 - [30 分钟快速开始](docs/quick-start.md)
 - [配置参考文档](docs/configuration.md)
+- [API 参考文档](docs/api.md)
 - [测试支持工具文档](docs/testing-support.md)
 
 ## 当前仓库结构

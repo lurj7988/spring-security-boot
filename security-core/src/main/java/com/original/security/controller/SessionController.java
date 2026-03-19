@@ -72,14 +72,14 @@ public class SessionController {
     /**
      * 查询所有用户的活跃会话（仅限管理员）。
      *
-     * @param page 页码（从 1 开始）
+     * @param page 页码（从 0 开始）
      * @param size 每页大小
      * @return 分页的会话列表
      */
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public Response<PageResult<SessionInfo>> getAllSessions(
-            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
         long startTime = System.currentTimeMillis();
@@ -87,9 +87,9 @@ public class SessionController {
         // Validate pagination inputs and log corrections
         int originalPage = page;
         int originalSize = size;
-        if (page < 1) {
-            page = 1;
-            log.warn("Invalid page parameter {} corrected to 1", originalPage);
+        if (page < 0) {
+            page = 0;
+            log.warn("Invalid page parameter {} corrected to 0", originalPage);
         }
         if (size < 1) {
             size = DEFAULT_PAGE_SIZE;
@@ -124,7 +124,7 @@ public class SessionController {
         // 内存分页
         // 注意：对于大量会话场景，建议实现数据库级分页或使用缓存优化
         int total = allSessions.size();
-        int startIndex = (page - 1) * size;
+        int startIndex = page * size;
         List<SessionInfo> pagedList = new ArrayList<>();
         if (startIndex < total) {
             int endIndex = Math.min(startIndex + size, total);

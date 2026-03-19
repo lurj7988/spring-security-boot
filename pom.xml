@@ -45,6 +45,7 @@
         <module>security-core</module>
         <module>security-common</module>
         <module>security-components</module>
+        <module>examples</module>
     </modules>
 
     <scm>
