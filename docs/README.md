@@ -2,32 +2,68 @@
 
 这是 Spring Security Boot 框架的文档目录，提供了完整的开发指南和参考信息。
 
+> 📅 **文档版本**: 2026-03-23
+
+---
+
 ## 📖 文档列表
 
 ### 🚀 快速开始
 
-- [**快速开始指南**](quick-start.md) - 30 分钟完成最小集成与启动验证
-- [**配置参考文档**](configuration.md) - 所有配置项的详细说明和示例
+| 文档 | 描述 |
+|------|------|
+| [**快速开始指南**](quick-start.md) | 30 分钟完成最小集成与启动验证，包含环境要求和配置步骤 |
+| [**配置参考文档**](configuration.md) | 所有配置项的详细说明，按功能分组，包含默认值和示例 |
 
 ### 🧪 开发支持
 
-- [**API 参考文档**](api.md) - 所有 API 端点的详细说明和使用示例
-- [**测试支持工具文档**](testing-support.md) - 为安全逻辑添加测试支持
+| 文档 | 描述 |
+|------|------|
+| [**API 参考文档**](api.md) | 所有 API 端点的详细说明，包含请求/响应格式和错误码 |
+| [**测试支持工具文档**](testing-support.md) | @WithMockUser、@SecurityTest、AuthenticationTestUtils 等测试工具 |
 
 ### 🔧 高级主题
 
-- [**插件开发指南**](plugin-development.md) - 扩展框架功能，开发自定义认证插件
-- [**故障排查指南**](troubleshooting.md) - 常见问题解决方案
+| 文档 | 描述 |
+|------|------|
+| [**插件开发指南**](plugin-development.md) | 扩展框架功能，开发自定义认证插件和过滤器插件 |
+| [**故障排查指南**](troubleshooting.md) | 常见问题诊断和解决方案，包含调试命令和 FAQ |
 
-### 🔒 安全合规
+### 🔒 安全合规 (security/)
 
-- [**等保 2.0 合规清单**](security/compliance.md) - 等保 2.0 合规要求与框架支持
-- [**安全最佳实践**](security/best-practices.md) - 密码、Token、会话、网络安全配置指南
-- [**安全 FAQ**](security/faq.md) - 安全常见问题解答
-- [**安全配置检查清单**](security/checklist.md) - 启动前/生产部署/定期审计检查
+| 文档 | 描述 |
+|------|------|
+| [**等保 2.0 合规清单**](security/compliance.md) | 网络安全等级保护 2.0 二级要求与框架支持对照 |
+| [**安全最佳实践**](security/best-practices.md) | 密码、Token、会话、网络安全配置指南 |
+| [**安全 FAQ**](security/faq.md) | 安全相关常见问题解答 |
+| [**安全配置检查清单**](security/checklist.md) | 启动前/生产部署/定期审计的安全检查项 |
 
-### 📋 计划中的文档
-- [快速开始示例项目](example-project.md) - 完整的示例工程（开发中）
+---
+
+## 📂 目录结构
+
+```
+docs/
+├── README.md               # 本索引文件
+├── quick-start.md          # 快速开始指南
+├── configuration.md        # 配置参考文档
+├── api.md                  # API 参考文档
+├── testing-support.md      # 测试支持工具文档
+├── plugin-development.md   # 插件开发指南
+├── troubleshooting.md      # 故障排查指南
+└── security/               # 安全合规文档
+    ├── compliance.md       # 等保 2.0 合规清单
+    ├── best-practices.md   # 安全最佳实践
+    ├── faq.md              # 安全 FAQ
+    └── checklist.md        # 安全配置检查清单
+```
+
+---
+
+## 🔗 相关资源
+
+- [项目上下文 (AI Agent)](../_bmad-output/project-context.md) - AI Agent 使用的项目规则和规范
+- [BMAD 输出索引](../_bmad-output/index.md) - 规划文档和实现工件索引
 
 ## 📚 文档导航
 
