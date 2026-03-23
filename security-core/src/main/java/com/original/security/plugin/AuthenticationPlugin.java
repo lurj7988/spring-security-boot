@@ -1,6 +1,6 @@
 package com.original.security.plugin;
 
-import com.original.security.core.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.lang.Nullable;
 
 /**
@@ -24,7 +24,7 @@ public interface AuthenticationPlugin {
     /**
      * 获取认证提供者实例
      *
-     * @return AuthenticationProvider 实现，提供实际的认证逻辑
+     * @return Spring Security 的 AuthenticationProvider 实现，提供实际的认证逻辑
      */
     @Nullable
     AuthenticationProvider getAuthenticationProvider();

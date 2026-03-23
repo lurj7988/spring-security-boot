@@ -21,6 +21,7 @@ import org.springframework.security.web.csrf.CsrfTokenRepository;
 import com.original.security.handler.FrameAccessDeniedHandler;
 import com.original.security.handler.FrameAuthenticationEntryPoint;
 import com.original.security.plugin.SecurityFilterPlugin;
+import com.original.security.plugin.AuthenticationPlugin;
 
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.web.session.InvalidSessionStrategy;
@@ -28,6 +29,7 @@ import org.springframework.security.web.session.SessionInformationExpiredStrateg
 
 import javax.servlet.Filter;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -95,6 +97,55 @@ public class SecurityAutoConfiguration {
     }
 
     /**
+     * 发现并记录所有已注册的认证插件。
+     * 该 Bean 用于可观测性和确保插件被正确加载。
+     * 实际的 AuthenticationProvider 注册由 Spring Security 处理（当 Provider 暴露为 Bean 时）。
+     *
+     * @param pluginsProvider 认证插件提供者
+     * @return 插件列表包装类
+     */
+    @Bean
+    public AuthenticationPluginRegistry authenticationPluginRegistry(ObjectProvider<AuthenticationPlugin> pluginsProvider) {
+        List<AuthenticationPlugin> plugins = pluginsProvider.orderedStream().collect(Collectors.toList());
+        log.info("Security auto-configuration: Discovered {} authentication plugin(s)", plugins.size());
+        plugins.forEach(plugin -> log.info("  - [{}] with provider: {}", 
+            plugin.getName(), 
+            plugin.getAuthenticationProvider() != null ? plugin.getAuthenticationProvider().getClass().getSimpleName() : "None"));
+        return new AuthenticationPluginRegistry(plugins);
+    }
+
+    /**
+     * 认证插件注册表包装类。
+     * <p>
+     * 用于存储和管理所有已注册的认证插件。
+     * </p>
+     *
+     * @author Original Security Team
+     * @since 1.0.0
+     */
+    public static class AuthenticationPluginRegistry {
+        private final List<AuthenticationPlugin> plugins;
+
+        /**
+         * 构造插件注册表。
+         *
+         * @param plugins 插件列表，如果为 null 则使用空列表
+         */
+        public AuthenticationPluginRegistry(List<AuthenticationPlugin> plugins) {
+            this.plugins = plugins != null ? plugins : java.util.Collections.emptyList();
+        }
+
+        /**
+         * 获取所有已注册的插件。
+         *
+         * @return 不可变的插件列表
+         */
+        public List<AuthenticationPlugin> getPlugins() {
+            return java.util.Collections.unmodifiableList(plugins);
+        }
+    }
+
+    /**
      * 构建并在容器中装配默认的 SecurityFilterChain。
      * <ul>
      *     <li>禁用默认的表单登录和 Basic 认证（后续由插件式架构接管）</li>
@@ -124,6 +175,7 @@ public class SecurityAutoConfiguration {
             ObjectProvider<CspProperties> cspPropertiesProvider,
             ObjectProvider<FrameAuthenticationEntryPoint> authenticationEntryPointProvider,
             ObjectProvider<SecurityFilterPlugin> filterPluginsProvider,
+            ObjectProvider<AuthenticationPluginRegistry> pluginRegistryProvider,
             ObjectProvider<SessionProperties> sessionPropertiesProvider,
             ObjectProvider<SessionRegistry> sessionRegistryProvider,
             ObjectProvider<SessionInformationExpiredStrategy> sessionExpiredStrategyProvider,

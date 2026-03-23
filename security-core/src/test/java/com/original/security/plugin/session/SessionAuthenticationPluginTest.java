@@ -37,7 +37,7 @@ class SessionAuthenticationPluginTest {
     @DisplayName("getAuthenticationProvider_ReturnsNull")
     void testGetAuthenticationProvider_ReturnsNull() {
         // When
-        com.original.security.core.authentication.AuthenticationProvider provider = plugin.getAuthenticationProvider();
+        org.springframework.security.authentication.AuthenticationProvider provider = plugin.getAuthenticationProvider();
 
         // Then
         assertNull(provider, "Session authentication relies on Spring Security built-in mechanisms");

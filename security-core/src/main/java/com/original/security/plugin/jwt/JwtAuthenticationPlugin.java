@@ -1,7 +1,7 @@
 package com.original.security.plugin.jwt;
 
-import com.original.security.core.authentication.AuthenticationProvider;
 import com.original.security.plugin.AuthenticationPlugin;
+import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.stereotype.Component;
 
 /**

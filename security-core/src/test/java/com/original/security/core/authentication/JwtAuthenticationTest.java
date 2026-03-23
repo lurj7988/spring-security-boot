@@ -32,7 +32,7 @@ import static org.mockito.Mockito.*;
 class JwtAuthenticationTest {
 
     private AuthenticationPlugin authenticationPlugin;
-    private AuthenticationProvider authenticationProvider;
+    private DefaultAuthenticationProvider authenticationProvider;
 
     @Mock
     private ConfigProvider mockConfigProvider;

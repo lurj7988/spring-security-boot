@@ -1,9 +1,15 @@
 package com.original.security.core.authentication.impl;
 
-import com.original.security.core.authentication.*;
+import com.original.security.core.authentication.AuthenticationException;
+import com.original.security.core.authentication.AuthenticationResult;
 import com.original.security.core.authentication.token.SimpleToken;
 import com.original.security.core.authentication.user.SecurityUser;
 import com.original.security.config.ConfigProvider;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -23,13 +29,25 @@ import java.util.stream.Collectors;
 /**
  * 默认认证提供者实现
  * <p>
- * 提供基于用户名密码的基本认证功能
+ * 提供基于用户名密码的基本认证功能。该类实现了双向认证提供者接口，同时支持：
+ * <ul>
+ *   <li>Spring Security 的 {@link AuthenticationProvider} 接口 - 用于 Spring Security 认证流程</li>
+ *   <li>框架自定义的 {@link com.original.security.core.authentication.AuthenticationProvider} 接口 - 用于框架统一认证 API</li>
+ * </ul>
+ * </p>
+ *
+ * <p><b>接口方法说明：</b></p>
+ * <ul>
+ *   <li>{@link #authenticate(Authentication)} - Spring Security 标准认证方法，接受 Authentication 对象</li>
+ *   <li>{@link #authenticate(String, String)} - 框架自定义方法，接受用户名和密码字符串</li>
+ *   <li>{@link #authenticate(Object, String)} - 框架自定义方法，接受 Map 格式的凭据</li>
+ * </ul>
  *
  * @author Original Security Team
  * @since 1.0.0
  */
 @Service
-public class DefaultAuthenticationProvider implements AuthenticationProvider {
+public class DefaultAuthenticationProvider implements AuthenticationProvider, com.original.security.core.authentication.AuthenticationProvider {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultAuthenticationProvider.class);
     private final PasswordEncoder passwordEncoder;
@@ -50,6 +68,66 @@ public class DefaultAuthenticationProvider implements AuthenticationProvider {
         initDefaultUsers();
     }
 
+    // ==================== Spring Security AuthenticationProvider ====================
+
+    /**
+     * Spring Security 标准认证方法。
+     * <p>
+     * 该方法处理 Spring Security 认证流程，验证用户名和密码。
+     * </p>
+     *
+     * @param authentication 认证请求对象，必须是 UsernamePasswordAuthenticationToken 类型
+     * @return 认证成功的 Authentication 对象
+     * @throws org.springframework.security.core.AuthenticationException 认证失败时抛出
+     */
+    @Override
+    public Authentication authenticate(Authentication authentication) throws org.springframework.security.core.AuthenticationException {
+        String username = authentication.getName();
+
+        // 空值检查：用户名不能为空
+        if (username == null || username.isEmpty()) {
+            throw new BadCredentialsException("Username not provided");
+        }
+
+        // 空值检查：凭据不能为空
+        Object credentials = authentication.getCredentials();
+        String password = credentials != null ? credentials.toString() : null;
+        if (password == null || password.isEmpty()) {
+            throw new BadCredentialsException("Credentials not provided");
+        }
+
+        SecurityUser user = userStore.get(username);
+
+        if (user == null) {
+            throw new UsernameNotFoundException("User not found: " + username);
+        }
+
+        if (user.getStatus() != SecurityUser.UserStatus.ACTIVE) {
+            throw new DisabledException("User account is not active");
+        }
+
+        String encodedPassword = getEncodedPassword(username);
+        if (encodedPassword == null) {
+            throw new BadCredentialsException("Invalid password");
+        }
+
+        if (!passwordEncoder.matches(password, encodedPassword)) {
+            throw new BadCredentialsException("Invalid password");
+        }
+
+        UserDetails userDetails = loadUserByUsername(username);
+        UsernamePasswordAuthenticationToken result = new UsernamePasswordAuthenticationToken(
+                userDetails, authentication.getCredentials(), userDetails.getAuthorities());
+        result.setDetails(authentication.getDetails());
+        return result;
+    }
+
+    @Override
+    public boolean supports(Class<?> authentication) {
+        return UsernamePasswordAuthenticationToken.class.isAssignableFrom(authentication);
+    }
+
+    // ==================== Framework AuthenticationProvider ====================
 
     @Override
     public AuthenticationResult authenticate(Object credentials, String authenticationType) throws AuthenticationException {

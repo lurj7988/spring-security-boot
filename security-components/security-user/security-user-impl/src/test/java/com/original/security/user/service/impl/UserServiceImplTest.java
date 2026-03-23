@@ -87,7 +87,7 @@ class UserServiceImplTest {
     private UserCreateRequest createValidRequest() {
         UserCreateRequest request = new UserCreateRequest();
         request.setUsername("testuser");
-        request.setPassword("password123");
+        request.setPassword("Password123!");  // 符合密码策略：包含数字、字母和特殊字符
         request.setEmail("test@example.com");
         return request;
     }
@@ -122,7 +122,7 @@ class UserServiceImplTest {
         assertTrue(result.isEnabled());
 
         // 验证密码加密
-        verify(passwordEncoder).encode("password123");
+        verify(passwordEncoder).encode("Password123!");
 
         // 验证事件发布
         ArgumentCaptor<UserCreatedEvent> eventCaptor = ArgumentCaptor.forClass(UserCreatedEvent.class);

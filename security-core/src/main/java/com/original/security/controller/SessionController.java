@@ -49,6 +49,7 @@ public class SessionController {
     private static final String WARN_NO_AUTHENTICATION = "No authentication found, returning empty session list";
     private static final int MAX_PAGE_SIZE = 1000;
     private static final int DEFAULT_PAGE_SIZE = 10;
+    private static final int MAX_PAGE_NUMBER = 10000;  // 防止整数溢出
 
     // 踢出原因常量
     private static final String KICK_REASON_ADMIN = "admin_kick";
@@ -79,17 +80,22 @@ public class SessionController {
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     public Response<PageResult<SessionInfo>> getAllSessions(
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
 
         long startTime = System.currentTimeMillis();
 
         // Validate pagination inputs and log corrections
+        // Page is 1-based, so minimum valid page is 1
         int originalPage = page;
         int originalSize = size;
-        if (page < 0) {
-            page = 0;
-            log.warn("Invalid page parameter {} corrected to 0", originalPage);
+        if (page < 1) {
+            page = 1;
+            log.warn("Invalid page parameter {} corrected to 1", originalPage);
+        }
+        if (page > MAX_PAGE_NUMBER) {
+            page = MAX_PAGE_NUMBER;
+            log.warn("Page parameter {} exceeds maximum, corrected to {}", originalPage, MAX_PAGE_NUMBER);
         }
         if (size < 1) {
             size = DEFAULT_PAGE_SIZE;
@@ -118,13 +124,16 @@ public class SessionController {
             }
         }
 
-        // 排序：按最后活跃时间降序
-        allSessions.sort(Comparator.comparing(SessionInfo::getLastActiveTime).reversed());
+        // 排序：按最后活跃时间降序（处理 null 值）
+        allSessions.sort(Comparator.comparing(
+            SessionInfo::getLastActiveTime,
+            Comparator.nullsLast(Comparator.reverseOrder())
+        ));
 
-        // 内存分页
+        // 内存分页 (page is 1-based)
         // 注意：对于大量会话场景，建议实现数据库级分页或使用缓存优化
         int total = allSessions.size();
-        int startIndex = page * size;
+        int startIndex = (page - 1) * size;
         List<SessionInfo> pagedList = new ArrayList<>();
         if (startIndex < total) {
             int endIndex = Math.min(startIndex + size, total);

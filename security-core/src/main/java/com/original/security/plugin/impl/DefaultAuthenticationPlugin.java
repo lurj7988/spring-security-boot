@@ -1,9 +1,9 @@
 package com.original.security.plugin.impl;
 
-import com.original.security.core.authentication.AuthenticationProvider;
-import com.original.security.core.authentication.JwtAuthenticationToken;
 import com.original.security.plugin.AuthenticationPlugin;
+import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import com.original.security.core.authentication.JwtAuthenticationToken;
 
 /**
  * 默认认证插件实现

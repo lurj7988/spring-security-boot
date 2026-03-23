@@ -1,11 +1,11 @@
 package com.original.security.plugin.session;
 
 import com.original.security.config.SessionProperties;
-import com.original.security.core.authentication.AuthenticationProvider;
 import com.original.security.plugin.AuthenticationPlugin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Component;
 

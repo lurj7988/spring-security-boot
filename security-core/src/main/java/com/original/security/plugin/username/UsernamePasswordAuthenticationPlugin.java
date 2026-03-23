@@ -1,8 +1,8 @@
 package com.original.security.plugin.username;
 
-import com.original.security.core.authentication.AuthenticationProvider;
 import com.original.security.plugin.AuthenticationPlugin;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Component;
 

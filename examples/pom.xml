@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.original.frame</groupId>
+        <artifactId>spring-security-boot</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>examples</artifactId>
+    <packaging>pom</packaging>
+    <name>Spring Security Boot Examples</name>
+    <description>Example projects demonstrating Spring Security Boot usage</description>
+
+    <!--
+        Note: Example projects (quick-start, jwt-frontend, plugins) are standalone
+        and use spring-boot-starter-parent. They are not built as part of the main project.
+        Build them individually from their respective directories.
+    -->
+
+    <properties>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
+</project>

@@ -1,6 +1,5 @@
 package com.original.security.plugin;
 
-import com.original.security.core.authentication.AuthenticationProvider;
 import com.original.security.core.authentication.JwtAuthenticationToken;
 import com.original.security.core.authentication.impl.DefaultAuthenticationProvider;
 import com.original.security.config.ConfigProvider;
@@ -11,15 +10,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
-import java.util.Collections;
-
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 /**
  * AuthenticationPlugin 单元测试
@@ -31,7 +28,7 @@ import static org.mockito.Mockito.*;
 class AuthenticationPluginTest {
 
     private AuthenticationPlugin authenticationPlugin;
-    private AuthenticationProvider authenticationProvider;
+    private DefaultAuthenticationProvider authenticationProvider;
 
     @Mock
     private AuthenticationProvider mockAuthenticationProvider;

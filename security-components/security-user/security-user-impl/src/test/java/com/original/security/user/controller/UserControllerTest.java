@@ -92,7 +92,7 @@ class UserControllerTest {
         // Given
         UserCreateRequest request = new UserCreateRequest();
         request.setUsername("newuser");
-        request.setPassword("password123");
+        request.setPassword("Password123!");  // 符合密码策略
         request.setEmail("newuser@example.com");
 
         // When & Then
@@ -117,7 +117,7 @@ class UserControllerTest {
         // Given
         UserCreateRequest request = new UserCreateRequest();
         request.setUsername("newuser");
-        request.setPassword("password123");
+        request.setPassword("Password123!");  // 符合密码策略
         request.setEmail("newuser2@example.com");
 
         // 先创建一个用户
@@ -140,7 +140,7 @@ class UserControllerTest {
         // Given
         UserCreateRequest request = new UserCreateRequest();
         request.setUsername("newuser2");
-        request.setPassword("password123");
+        request.setPassword("Password123!");  // 符合密码策略
         request.setEmail("test@example.com");
 
         // 先创建一个用户
@@ -163,7 +163,7 @@ class UserControllerTest {
         // Given
         UserCreateRequest request = new UserCreateRequest();
         request.setUsername("");
-        request.setPassword("password123");
+        request.setPassword("Password123!");  // 符合密码策略
         request.setEmail("test@example.com");
 
         // When & Then
@@ -183,7 +183,7 @@ class UserControllerTest {
         // Given
         UserCreateRequest request = new UserCreateRequest();
         request.setUsername("newuser");
-        request.setPassword("password123");
+        request.setPassword("Password123!");  // 符合密码策略
         request.setEmail("invalid-email");
 
         // When & Then
@@ -223,7 +223,7 @@ class UserControllerTest {
         // Given
         UserCreateRequest request = new UserCreateRequest();
         request.setUsername("testuser");
-        request.setPassword("password123");
+        request.setPassword("Password123!");  // 符合密码策略
         request.setEmail("testuser@example.com");
 
         // When
