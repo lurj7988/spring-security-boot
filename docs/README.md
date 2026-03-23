@@ -19,9 +19,15 @@
 - [**插件开发指南**](plugin-development.md) - 扩展框架功能，开发自定义认证插件
 - [**故障排查指南**](troubleshooting.md) - 常见问题解决方案
 
+### 🔒 安全合规
+
+- [**等保 2.0 合规清单**](security/compliance.md) - 等保 2.0 合规要求与框架支持
+- [**安全最佳实践**](security/best-practices.md) - 密码、Token、会话、网络安全配置指南
+- [**安全 FAQ**](security/faq.md) - 安全常见问题解答
+- [**安全配置检查清单**](security/checklist.md) - 启动前/生产部署/定期审计检查
+
 ### 📋 计划中的文档
 - [快速开始示例项目](example-project.md) - 完整的示例工程（开发中）
-- [安全合规文档](security-compliance.md) - 安全配置和合规检查（开发中）
 
 ## 📚 文档导航
 
@@ -32,8 +38,13 @@
 ├── configuration.md       ← ⚙️ 配置参考
 ├── api.md                 ← 📖 API 参考
 ├── testing-support.md     ← 🧪 测试支持
-├── plugin-development.md   ← 🔧 插件开发
-└── troubleshooting.md     ← 🔍 故障排查
+├── plugin-development.md  ← 🔧 插件开发
+├── troubleshooting.md     ← 🔍 故障排查
+└── security/              ← 🔒 安全合规
+    ├── compliance.md      ← 等保 2.0 合规清单
+    ├── best-practices.md  ← 安全最佳实践
+    ├── faq.md             ← 安全 FAQ
+    └── checklist.md       ← 安全配置检查清单
 ```
 
 ## 🎯 推荐阅读路径
@@ -54,6 +65,11 @@
 2. 重点阅读 **[配置参考文档](configuration.md)** 中的生产环境配置建议
 3. 参考 **[测试支持工具](testing-support.md)** 确保部署质量
 
+### 安全审计员
+1. 查看 **[等保 2.0 合规清单](security/compliance.md)** 了解合规支持
+2. 参考 **[安全最佳实践](security/best-practices.md)** 进行安全配置
+3. 使用 **[安全配置检查清单](security/checklist.md)** 进行审计检查
+
 ## 📞 获取帮助
 
 如果在文档中找不到答案：
@@ -64,4 +80,4 @@
 
 ---
 
-**文档最后更新：** 2026-03-20
+**文档最后更新：** 2026-03-23
